@@ -1,0 +1,70 @@
+/* איפוס בסיסי */
+html, body {
+    margin: 0;
+    padding: 0;
+    width: 100%;
+    height: 100%;
+    font-family: Arial, sans-serif;
+    background-color: #ffffff; /* רקע רגיל לכל השאר */
+    direction: rtl;
+}
+
+/* Header כחול בלבד */
+.header {
+    position: fixed;
+    top: 0;
+    right: 0;
+    width: 100%;
+    height: 60px;
+    background-color: #1e90ff;
+    color: white;
+    display: flex;
+    align-items: center;
+    padding-right: 20px;
+    font-size: 18px;
+    font-weight: bold;
+    box-sizing: border-box;
+    z-index: 1000;
+}
+
+/* תוכן האפליקציה */
+.search-container {
+    margin-top: 60px; /* גובה ה-Header */
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: calc(100vh - 60px);
+    background-color: #ffffff; /* ללא כחול */
+}
+
+/* חיפוש */
+.search-form {
+    display: flex;
+    gap: 10px;
+}
+
+.search-input {
+    width: 300px;
+    padding: 10px;
+    font-size: 16px;
+    text-align: right;
+}
+
+.search-button,
+.tables-button {
+    padding: 10px 16px;
+    font-size: 16px;
+    cursor: pointer;
+}
+
+.tables-button {
+    margin-top: 15px;
+}
+
+/* תוצאות */
+.search-result {
+    margin-top: 20px;
+    max-width: 700px;
+    white-space: pre-wrap;
+}
