@@ -15,12 +15,12 @@ const SearchBox = () => {
         setLoading(true);
         setResult("");
 
-        const API_KEY = "AIzaSyBxzVLc-JDlkTzb_kpWuil9XSblmofmlHQ";
+        const API_KEY = "AIzaSyC3GbaCohWpSH6bODTHQ6uBPKvJOV7yocc";
 
         // זה ה-URL המדויק לפי המודל שמצאת ברשימה:
-        const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${API_KEY}`;
-        const systemPrompt = `You are a SQL Expert. Schema: 
-                              DATABASE SCHEMA:
+            const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${API_KEY}`;                
+            const systemPrompt = `You are a SQL Expert. Schema: 
+                                DATABASE SCHEMA:
                                 1. DEPARTMENT (dept_id PK [int], name, head_of_dept)
                                 2. PROGRAM (program_id PK [string], program_name, dept_id FK [int])
                                 3. STUDENT (ID PK [string], full_name, program_id FK [string], start_year, start_semester, academic_status)
