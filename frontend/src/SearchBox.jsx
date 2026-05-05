@@ -1,19 +1,17 @@
 import { useState } from "react";
-
-
 // 2. הגדרת המפתח (בשלב הפיתוח זה כאן, בהפקה זה יהיה ב-env)
-
-
 const SearchBox = () => {
     const [query, setQuery] = useState("");
     const [result, setResult] = useState("");
     const [loading, setLoading] = useState(false);
+    const [dbData, setDbData] = useState([])
     const handleSearch = async (e) => {
         e.preventDefault();
         if (!query) return;
 
+        setResult("");     // מנקה את ה-SQL הישן
+        setDbData([]);     // מנקה את התוצאות הישנות מהקונסול/טבלה
         setLoading(true);
-        setResult("");
 
         const API_KEY = "AIzaSyC3GbaCohWpSH6bODTHQ6uBPKvJOV7yocc";
 
@@ -47,7 +45,9 @@ const SearchBox = () => {
             } else if (data.candidates && data.candidates[0].content) {
                 const sqlText = data.candidates[0].content.parts[0].text;
                 // ניקוי סימני ה-Markdown
-                setResult(sqlText.replace(/```sql|```/g, "").trim());
+                const cleanSql = data.candidates[0].content.parts[0].text.replace(/```sql|```/g, "").trim();
+                setResult(cleanSql);
+                await runQueryOnServer(cleanSql);
             } else {
                 setResult("התקבלה תשובה ריקה מהמודל.");
             }
@@ -56,6 +56,27 @@ const SearchBox = () => {
             console.error(error);
         } finally {
             setLoading(false);
+        }
+    };
+    const runQueryOnServer = async (sql) => {
+        try {
+            const response = await fetch('http://localhost:5000/execute-sql', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ sql: sql })
+            });
+            const data = await response.json();
+            
+            if (data.error) {
+                console.error("Database Error:", data.error);
+            } else {
+                console.log("✅ נתונים התקבלו מה-SQLite:");
+                // console.table מציגה את המערך כטבלה יפה בקונסול
+                console.table(data)
+                setDbData(data); // שמירת התוצאות (השורות) ב-State
+            }
+        } catch (error) {
+            console.error("Could not connect to Server:", error);
         }
     };
     const handleShowTables = () => {
