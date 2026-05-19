@@ -13,10 +13,10 @@ const SearchBox = () => {
         setDbData([]);     // מנקה את התוצאות הישנות מהקונסול/טבלה
         setLoading(true);
 
-        const API_KEY = "AIzaSyC3GbaCohWpSH6bODTHQ6uBPKvJOV7yocc";
+        const API_KEY = "AIzaSyDhzSHSLh3YCk2BATDTPVDJqRODBqs83Oc";
 
         // זה ה-URL המדויק לפי המודל שמצאת ברשימה:
-            const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${API_KEY}`;                
+            const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=AIzaSyDhzSHSLh3YCk2BATDTPVDJqRODBqs83Oc`;
             const systemPrompt = `You are a SQL Expert. Schema: 
                                 DATABASE SCHEMA:
                                 1. DEPARTMENT (dept_id PK [int], name, head_of_dept)
