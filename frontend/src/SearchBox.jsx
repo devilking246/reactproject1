@@ -1,10 +1,12 @@
 import { useState } from "react";
+
 // 2. הגדרת המפתח (בשלב הפיתוח זה כאן, בהפקה זה יהיה ב-env)
 const SearchBox = () => {
     const [query, setQuery] = useState("");
     const [result, setResult] = useState("");
     const [loading, setLoading] = useState(false);
     const [dbData, setDbData] = useState([])
+    const [executedSql, setExecutedSql] = useState("");
     const handleSearch = async (e) => {
         e.preventDefault();
         if (!query) return;
@@ -69,7 +71,7 @@ const SearchBox = () => {
             setLoading(false);
         }
     };
-    const runQueryOnServer = async (sql) => {
+   const runQueryOnServer = async (sql) => {
         try {
             const response = await fetch('http://localhost:5000/execute-sql', {
                 method: 'POST',
@@ -81,10 +83,11 @@ const SearchBox = () => {
             if (data.error) {
                 console.error("Database Error:", data.error);
             } else {
-                console.log("✅ נתונים התקבלו מה-SQLite:");
-                // console.table מציגה את המערך כטבלה יפה בקונסול
-                console.table(data)
-                setDbData(data); // שמירת התוצאות (השורות) ב-State
+                console.log("✅ השאילתה שבוצעה:", data.sql);
+                console.table(data.results);
+                
+                setExecutedSql(data.sql); // שמירת השאילתה ל-State
+                setDbData(data.results);  // שמירת התוצאות ל-State
             }
         } catch (error) {
             console.error("Could not connect to Server:", error);
@@ -107,13 +110,39 @@ const SearchBox = () => {
                 <button type="submit" className="search-button">חפש</button>
             </form>
 
-            <button onClick={handleShowTables} className="tables-button">
-                הצג את כל הטבלאות
-            </button>
+            {/* הצגת השאילתה שבוצעה */}
+            {executedSql && (
+                <div style={{ marginTop: '20px', padding: '10px', background: '#e9ecef', borderRadius: '5px', direction: 'ltr' }}>
+                    <strong>השאילתה שבוצעה:</strong>
+                    <pre><code>{executedSql}</code></pre>
+                </div>
+            )}
 
-            {result && <div className="search-result">{result}</div>}
+            {/* הצגת הטבלה של הנתונים מה-DB */}
+            {dbData.length > 0 && (
+                <div className="results-table" style={{ marginTop: '20px', overflowX: 'auto' }}>
+                    <h3>תוצאות:</h3>
+                    <table border="1" style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'right' }}>
+                        <thead>
+                            <tr>
+                                {Object.keys(dbData[0]).map((key) => (
+                                    <th key={key} style={{ padding: '8px', background: '#f2f2f2' }}>{key}</th>
+                                ))}
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {dbData.map((row, index) => (
+                                <tr key={index}>
+                                    {Object.values(row).map((val, i) => (
+                                        <td key={i} style={{ padding: '8px', border: '1px solid #ddd' }}>{val}</td>
+                                    ))}
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
+            )}
         </div>
     );
-};
-
+}
 export default SearchBox;
