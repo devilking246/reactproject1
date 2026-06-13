@@ -17,17 +17,27 @@ const SearchBox = () => {
 
         // זה ה-URL המדויק לפי המודל שמצאת ברשימה:
             const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=AIzaSyDhzSHSLh3YCk2BATDTPVDJqRODBqs83Oc`;
-            const systemPrompt = `You are a SQL Expert. Schema: 
-                                DATABASE SCHEMA:
-                                1. DEPARTMENT (dept_id PK [int], name, head_of_dept)
-                                2. PROGRAM (program_id PK [string], program_name, dept_id FK [int])
-                                3. STUDENT (ID PK [string], full_name, program_id FK [string], start_year, start_semester, academic_status)
-                                4. LECTURER (id_number PK [string], full_name, dept_id FK [int])
-                                5. COURSE (course_num PK [int], course_id, course_name, dept_id FK [int], lecturer_id FK [string], year_taught, semester)
-                                6. ENROL (student_id FK [string], course_num FK [int], grade [int])
-                                Convert this to SQL: "${query}". 
-                                Return ONLY the SQL code, no markdown.`;
-        try {
+            const systemPrompt = `You are a SQL Expert. Your task is to convert natural language queries into accurate SQLite queries based on the database schema below.
+
+            DATABASE SCHEMA:
+            1. DEPARTMENT (dept_id PK [int], name [string], head_of_dept [string], school_head_username NULL [string])
+                - school_head_username links to USER.username for School Head role-based boundaries.
+            2. PROGRAM (program_id PK [string], program_name [string], dept_id FK [int])
+            3. COURSE (course_num PK [int], course_id [string], course_name [string])
+            4. CURRICULUM_COURSE (program_id PK FK [string], course_num PK FK [int], credits [real], recommended_year [int], recommended_semester [string], course_type [string])
+            5. LECTURER (id_number PK [string], full_name [string], dept_id FK [int])
+            6. SEMESTER_COURSE (semester_course_id PK AUTOINCREMENT [int], course_num FK [int], lecturer_id FK [string], year_taught [int], semester [string], exam_date_a [string], exam_date_b [string])
+            7. STUDENT (ID PK [string], full_name [string], program_id FK [string], start_year [int], start_semester [string], academic_status [string])
+            8. ENROL (student_id PK FK [string], semester_course_id PK FK [int], grade [int])
+            9. USER (user_id PK AUTOINCREMENT [int], username UNIQUE [string], password_hash [string], full_name [string], role [string], associated_dept_id NULL FK [int])
+                - role can be 'PRESIDENT', 'SCHOOL_HEAD', or 'DEPT_HEAD'.
+                - associated_dept_id is only filled if role is 'DEPT_HEAD'.
+
+            CRITICAL INSTRUCTIONS:
+                - Convert this user request into SQLite code: "${query}".
+                - Return ONLY the executable SQL code block. Do NOT include markdown blocks (\`\`\`sql) or explanations.`;
+        
+            try {
             const response = await fetch(url, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },

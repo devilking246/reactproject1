@@ -6,11 +6,11 @@ const path = require('path');
 
 const app = express();
 app.use(cors());
-app.use(express.json());
+app.use(express.json()); 
 
 let db;
 
-// 1. חיבור למסד הנתונים (ייצור קובץ database.db אם הוא לא קיים)
+// 1. חיבור למסד הנתונים
 (async () => {
     db = await open({
         filename: path.join(__dirname, 'university.db'),
@@ -24,11 +24,42 @@ app.post('/execute-sql', async (req, res) => {
     const { sql } = req.body;
     
     try {
-        // חשוב: בשימוש אמיתי כדאי לוודא שהשאילתה מתחילה ב-SELECT למניעת מחיקות
         const results = await db.all(sql);
         res.json(results);
     } catch (error) {
         res.status(400).json({ error: "שגיאה בהרצת השאילתה: " + error.message });
+    }
+});
+
+app.post('/api/login', async (req, res) => {
+    const { username, password } = req.body;
+
+    if (!username || !password) {
+        return res.status(400).json({ error: "נא למלא שם משתמש וסיסמה" });
+    }
+
+    try {
+        const sql = `SELECT user_id, username, full_name, role, associated_dept_id, password_hash FROM USER WHERE username = ?`;
+        const user = await db.get(sql, [username]);
+
+        if (!user) {
+            return res.status(401).json({ error: "שם משתמש או סיסמה שגויים" });
+        }
+
+        if (user.password_hash !== password) {
+            return res.status(401).json({ error: "שם משתמש או סיסמה שגויים" });
+        }
+
+        delete user.password_hash;
+
+        res.json({
+            message: "התחברות בוצעה בהצלחה",
+            user: user
+        });
+
+    } catch (error) {
+        console.error("Login Error:", error);
+        res.status(500).json({ error: "שגיאת שרת פנימית בתהליך ההתחברות" });
     }
 });
 

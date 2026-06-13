@@ -5,75 +5,281 @@ const { promisify } = require('util');
 async function setup() {
     const db = new sqlite3.Database('./university.db');
     
-    // הפיכת הפונקציות של sqlite ל-Promises כדי שנוכל לחכות להן
+    // הפיכת הפונקציות של sqlite ל-Promises
     const dbRun = promisify(db.run.bind(db));
     const dbClose = promisify(db.close.bind(db));
+
+    // === שלב 0: ניקוי אגרסיבי של טבלאות ישנות (חובה כדי לרענן עמודות חדשות!) ===
+    try {
+        await dbRun(`DROP TABLE IF EXISTS USER`);
+        await dbRun(`DROP TABLE IF EXISTS ENROL`);
+        await dbRun(`DROP TABLE IF EXISTS SEMESTER_COURSE`);
+        await dbRun(`DROP TABLE IF EXISTS CURRICULUM_COURSE`);
+        await dbRun(`DROP TABLE IF EXISTS COURSE`);
+        await dbRun(`DROP TABLE IF EXISTS STUDENT`);
+        await dbRun(`DROP TABLE IF EXISTS LECTURER`);
+        await dbRun(`DROP TABLE IF EXISTS PROGRAM`);
+        await dbRun(`DROP TABLE IF EXISTS DEPARTMENT`);
+        console.log("🧹 Old tables cleaned up successfully.");
+    } catch (e) {
+        console.log("No old tables to drop, starting fresh...");
+    }
 
     try {
         console.log("Creating tables...");
         
-        await dbRun(`CREATE TABLE IF NOT EXISTS DEPARTMENT (dept_id INTEGER PRIMARY KEY, name TEXT, head_of_dept TEXT)`);
-        await dbRun(`CREATE TABLE IF NOT EXISTS PROGRAM (program_id TEXT PRIMARY KEY, program_name TEXT, dept_id INTEGER)`);
-        await dbRun(`CREATE TABLE IF NOT EXISTS STUDENT (ID TEXT PRIMARY KEY, full_name TEXT, program_id TEXT, start_year INTEGER, start_semester TEXT, academic_status TEXT)`);
-        await dbRun(`CREATE TABLE IF NOT EXISTS LECTURER (id_number TEXT PRIMARY KEY, full_name TEXT, dept_id INTEGER)`);
-        await dbRun(`CREATE TABLE IF NOT EXISTS COURSE (course_num INTEGER PRIMARY KEY, course_id TEXT, course_name TEXT, dept_id INTEGER, lecturer_id TEXT, year_taught INTEGER, semester TEXT)`);
-        await dbRun(`CREATE TABLE IF NOT EXISTS ENROL (student_id TEXT, course_num INTEGER, grade INTEGER, PRIMARY KEY (student_id, course_num))`);
+        // 1. מחלקות - מעודכן עם עמודת שיוך לראש בית ספר
+        await dbRun(`CREATE TABLE IF NOT EXISTS DEPARTMENT (
+            dept_id INTEGER PRIMARY KEY, 
+            name TEXT, 
+            head_of_dept TEXT,
+            school_head_username TEXT NULL
+        )`);
+
+        // 2. תוכניות לימודים אקדמיות
+        await dbRun(`CREATE TABLE IF NOT EXISTS PROGRAM (
+            program_id TEXT PRIMARY KEY,   
+            program_name TEXT,             
+            dept_id INTEGER,               
+            FOREIGN KEY(dept_id) REFERENCES DEPARTMENT(dept_id)
+        )`);
+
+        // 3. בנק קורסים כללי
+        await dbRun(`CREATE TABLE IF NOT EXISTS COURSE (
+            course_num INTEGER PRIMARY KEY, 
+            course_id TEXT UNIQUE,          
+            course_name TEXT                
+        )`);
+
+        // 4. טבלת קישור: שיבוץ קורסים בתוך תוכניות הלימודים
+        await dbRun(`CREATE TABLE IF NOT EXISTS CURRICULUM_COURSE (
+            program_id TEXT,
+            course_num INTEGER,
+            credits REAL,                   
+            recommended_year INTEGER,       
+            recommended_semester TEXT,      
+            course_type TEXT,               
+            PRIMARY KEY (program_id, course_num),
+            FOREIGN KEY(program_id) REFERENCES PROGRAM(program_id),
+            FOREIGN KEY(course_num) REFERENCES COURSE(course_num)
+        )`);
+
+        // 5. מרצים
+        await dbRun(`CREATE TABLE IF NOT EXISTS LECTURER (
+            id_number TEXT PRIMARY KEY, 
+            full_name TEXT, 
+            dept_id INTEGER,
+            FOREIGN KEY(dept_id) REFERENCES DEPARTMENT(dept_id)
+        )`);
+
+        // 6. קורסים שמתקיימים בפועל בסמסטר ספציפי (כולל מועדי בחינות)
+        await dbRun(`CREATE TABLE IF NOT EXISTS SEMESTER_COURSE (
+            semester_course_id INTEGER PRIMARY KEY AUTOINCREMENT,
+            course_num INTEGER,
+            lecturer_id TEXT,
+            year_taught INTEGER,           
+            semester TEXT,                 
+            exam_date_a TEXT,
+            exam_date_b TEXT,
+            FOREIGN KEY(course_num) REFERENCES COURSE(course_num),
+            FOREIGN KEY(lecturer_id) REFERENCES LECTURER(id_number)
+        )`);
+
+        // 7. סטודנטים
+        await dbRun(`CREATE TABLE IF NOT EXISTS STUDENT (
+            ID TEXT PRIMARY KEY, 
+            full_name TEXT, 
+            program_id TEXT,               
+            start_year INTEGER, 
+            start_semester TEXT, 
+            academic_status TEXT,
+            FOREIGN KEY(program_id) REFERENCES PROGRAM(program_id)
+        )`);
+
+        // 8. הרשמה וציונים
+        await dbRun(`CREATE TABLE IF NOT EXISTS ENROL (
+            student_id TEXT, 
+            semester_course_id INTEGER, 
+            grade INTEGER, 
+            PRIMARY KEY (student_id, semester_course_id),
+            FOREIGN KEY(student_id) REFERENCES STUDENT(ID),
+            FOREIGN KEY(semester_course_id) REFERENCES SEMESTER_COURSE(semester_course_id)
+        )`);
+
+        // 9. משתמשי המערכת והרשאות גישה (Roles) - גרסה נקייה
+        await dbRun(`CREATE TABLE IF NOT EXISTS USER (
+            user_id INTEGER PRIMARY KEY AUTOINCREMENT,
+            username TEXT UNIQUE,
+            password_hash TEXT, 
+            full_name TEXT,
+            role TEXT,                  
+            associated_dept_id INTEGER NULL, 
+            FOREIGN KEY(associated_dept_id) REFERENCES DEPARTMENT(dept_id)
+        )`);
 
         console.log("Seeding data...");
-
-        // התחלת Transaction לביצועים מהירים ומניעת איבוד נתונים
         await dbRun("BEGIN TRANSACTION");
 
-        // 1. מחלקות
-        const deptIds = [101, 102, 103, 104];
-        for (const id of deptIds) {
-            await dbRun(`INSERT OR IGNORE INTO DEPARTMENT VALUES (?, ?, ?)`, [id, faker.commerce.department(), faker.person.fullName()]);
+        // הגדרת מערך המחלקות עם שיוך מפורש לראש בית ספר (לפי ה-username שלו)
+        const departments = [
+            [101, 'הנדסת תוכנה', "פרופ' אברהם כהן", 'school_head_1'],
+            [102, 'מדעי המחשב', 'ד"ר מיכל לוי', 'school_head_1'],
+            [103, 'הנדסת אלקטרוניקה', "פרופ' משה מזרחי", 'school_head_2'],
+            [104, 'הנדסת תעשייה וניהול', 'ד"ר דוד ישראלי', 'school_head_2']
+        ];
+
+        // 1. הזרקת מחלקות קבועות (4 ערכים לעמודות המעודכנות)
+        for (const dept of departments) {
+            await dbRun(`INSERT OR IGNORE INTO DEPARTMENT VALUES (?, ?, ?, ?)`, dept);
         }
 
-        // 2. תוכניות לימוד
-        const programIds = ['PROG-CS', 'PROG-ENG', 'PROG-BIO'];
-        for (const [index, id] of programIds.entries()) {
-            await dbRun(`INSERT OR IGNORE INTO PROGRAM VALUES (?, ?, ?)`, [id, faker.commerce.productName(), deptIds[index % deptIds.length]]);
+        // 2. הזרקת תוכניות הלימודים
+        const programs = [
+            ['PROG_SOFTWARE', 'תוכנית לימודים בהנדסת תוכנה', 101],
+            ['PROG_CS', 'תוכנית לימודים במדעי המחשב', 102],
+            ['PROG_ELEC', 'תוכנית לימודים בהנדסת אלקטרוניקה', 103],
+            ['PROG_INDUSTRIAL', 'תוכנית לימודים בהנדסת תעשייה וניהול', 104]
+        ];
+        for (const prog of programs) {
+            await dbRun(`INSERT OR IGNORE INTO PROGRAM VALUES (?, ?, ?)`, prog);
         }
 
-        // 3. מרצים
+        // 3. בנק קורסים קבוע (40 קורסים)
+        const sampleCourses = [
+            [10003, 'SE10003', 'אלגברה לינארית 1'], [10124, 'SE10124', 'מבוא לחדו"א'],
+            [10151, 'SE10151', 'מבוא לתכנות'], [10152, 'SE10152', 'מתמטיקה בדידה 1'],
+            [10008, 'SE10008', 'אלגוריתמיקה 2'], [10031, 'SE10031', 'מבני נתונים'],
+            [10160, 'SE10160', 'מערכות הפעלה'], [10034, 'SE10034', 'רשתות תקשורת מחשבים'],
+            [10055, 'SE10055', 'תכנות מונחה עצמים'], [10111, 'SE10111', 'פיתוח אפליקציות ווב'],
+            
+            [11033, 'CS11033', 'מבוא לתכנות למדעי המחשב'], [11034, 'CS11034', 'מתמטיקה בדידה למדעי המחשב'],
+            [10149, 'CS10149', 'למידת מכונה מתיאוריה למעשה'], [10156, 'CS10156', 'נושאים בבינה מלאכותית'],
+            [10148, 'CS10148', 'צפנים ומפתחות: יסודות הקריפטוגרפיה'], [10158, 'CS10158', 'עיבוד תמונה ולמידה עמוקה'],
+            [10155, 'CS10155', 'פיתוח אינטראקטיבי תלת-ממדי'], [10159, 'CS10159', 'למידת חיזוק בבינה מלאכותית'],
+            
+            [96004, 'EE96004', 'אלגברה לינארית לאלקטרוניקה'], [40019, 'EE40019', 'מיתוג ומערכות ספרתיות'],
+            [40021, 'EE40021', 'מבוא להנדסת חשמל 1'], [40025, 'EE40022', 'שדות אלקטרומגנטיים'],
+            [40030, 'EE40030', 'מערכות ליניאריות'], [40048, 'EE40048', 'עיבוד ספרתי של תמונות'],
+            [40110, 'EE40110', 'ראייה ממוחשבת'], [40120, 'EE40120', 'לייזרים ואופטיקה מודרנית'],
+            [40122, 'EE40122', 'יסודות אופטיקה ביו-רפואית'], [40050, 'EE40050', 'מיקרו-מעבדים ומערכות משובצות'],
+            
+            [30015, 'IS30015', 'יסודות התכנות לתעשייה וניהול'], [30039, 'IS30039', 'כלים מתמטיים לניהול'],
+            [30077, 'IS30077', 'תכנות בסביבת אינטרנט'], [30095, 'IS30095', 'חקר ביצועים 1'],
+            [31026, 'IS31026', 'שיווק ופרסום באינטרנט'], [30553, 'IS30553', 'סמינר מחלקתי תעשייה וניהול'],
+            [30997, 'IS30997', 'סיור מחלקתי'], [30012, 'IS30012', 'מבוא לכלכלה הנדסית'],
+            [30044, 'IS30044', 'ניהול השקעות ומימון'], [30088, 'IS30088', 'ניהול מערכות ייצור ומלאי']
+        ];
+        for (const course of sampleCourses) {
+            await dbRun(`INSERT OR IGNORE INTO COURSE VALUES (?, ?, ?)`, course);
+        }
+
+        // 4. שיבוץ קורסים בתוכניות הלימודים
+        for (let i = 0; i < sampleCourses.length; i++) {
+            let progId = 'PROG_SOFTWARE';
+            if (i >= 10 && i < 18) progId = 'PROG_CS';
+            if (i >= 18 && i < 28) progId = 'PROG_ELEC';
+            if (i >= 28) progId = 'PROG_INDUSTRIAL';
+
+            const courseNum = sampleCourses[i][0];
+            const credits = faker.helpers.arrayElement([3.0, 3.5, 4.0, 5.5]);
+            const year = faker.helpers.arrayElement([1, 2, 3, 4]);
+            const sem = faker.helpers.arrayElement(['A', 'B']);
+            const type = faker.helpers.arrayElement(['חובה', 'בחירה']);
+
+            await dbRun(`INSERT OR IGNORE INTO CURRICULUM_COURSE VALUES (?, ?, ?, ?, ?, ?)`,
+                [progId, courseNum, credits, year, sem, type]
+            );
+        }
+
+        // 5. מרצים (שמות נקיים בלבד)
         const lecturerIds = [];
-        for (let i = 0; i < 15; i++) {
+        const deptIds = [101, 102, 103, 104];
+        for (let i = 0; i < 12; i++) {
             const id = faker.string.numeric(9);
             lecturerIds.push(id);
-            await dbRun(`INSERT OR IGNORE INTO LECTURER VALUES (?, ?, ?)`, [id, faker.person.fullName(), faker.helpers.arrayElement(deptIds)]);
+            const lecturerName = faker.person.fullName(); 
+            await dbRun(`INSERT OR IGNORE INTO LECTURER VALUES (?, ?, ?)`, 
+                [id, lecturerName, faker.helpers.arrayElement(deptIds)]
+            );
         }
 
-        // 4. סטודנטים
+        // 7. סטודנטים
         const studentIds = [];
-        for (let i = 0; i < 50; i++) {
+        const programIds = ['PROG_SOFTWARE', 'PROG_CS', 'PROG_ELEC', 'PROG_INDUSTRIAL'];
+        for (let i = 0; i < 40; i++) {
             const id = faker.string.numeric(9);
             studentIds.push(id);
-            await dbRun(`INSERT OR IGNORE INTO STUDENT VALUES (?, ?, ?, ?, ?, ?)`, [id, faker.person.fullName(), faker.helpers.arrayElement(programIds), 2024, 'A', 'Active']);
+            await dbRun(`INSERT OR IGNORE INTO STUDENT VALUES (?, ?, ?, ?, ?, ?)`, 
+                [id, faker.person.fullName(), faker.helpers.arrayElement(programIds), 2024, 'A', 'Active']
+            );
         }
 
-        // 5. קורסים
-        const courseNums = [];
-        for (let i = 0; i < 20; i++) {
-            const cNum = 2000 + i;
-            courseNums.push(cNum);
-            await dbRun(`INSERT OR IGNORE INTO COURSE VALUES (?, ?, ?, ?, ?, ?, ?)`, [cNum, 'CS'+cNum, faker.company.catchPhrase(), faker.helpers.arrayElement(deptIds), faker.helpers.arrayElement(lecturerIds), 2026, 'A']);
+        // 6. קורסים סמסטריאליים בפועל (כולל תאריכי הבחינות)
+        const semA_StartA = '2026-06-22', semA_EndA = '2026-07-15';
+        const semA_StartB = '2026-07-20', semA_EndB = '2026-08-15';
+        const semB_StartA = '2026-10-20', semB_EndA = '2026-11-12';
+        const semB_StartB = '2026-11-18', semB_EndB = '2026-12-15';
+
+        for (let i = 0; i < sampleCourses.length; i++) {
+            const courseNum = sampleCourses[i][0];
+            const semester = faker.helpers.arrayElement(['A', 'B']);
+            
+            let dateA = semester === 'A' ? semA_StartA : semB_StartA;
+            let dateB = semester === 'A' ? semA_StartB : semB_StartB;
+
+            await dbRun(`INSERT INTO SEMESTER_COURSE (course_num, lecturer_id, year_taught, semester, exam_date_a, exam_date_b) VALUES (?, ?, ?, ?, ?, ?)`,
+                [courseNum, faker.helpers.arrayElement(lecturerIds), 2026, semester, dateA, dateB]
+            );
         }
 
-        // 6. הרשמה
+        // 8. הרשמה וציונים (ENROL)
         for (const sId of studentIds) {
-            const myCourses = faker.helpers.arrayElements(courseNums, { min: 2, max: 4 });
-            for (const cNum of myCourses) {
-                await dbRun(`INSERT OR IGNORE INTO ENROL VALUES (?, ?, ?)`, [sId, cNum, faker.number.int({ min: 40, max: 100 })]);
+            const myCourseIds = faker.helpers.arrayElements([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15], { min: 3, max: 5 });
+            for (const semCourseId of myCourseIds) {
+                await dbRun(`INSERT OR IGNORE INTO ENROL VALUES (?, ?, ?)`, 
+                    [sId, semCourseId, faker.number.int({ min: 55, max: 100 })]
+                );
             }
         }
 
+        // 9. הזרקת משתמשי המערכת
+        console.log("Seeding system users...");
+
+        // א. הזרקת נשיאת המכללה
+        await dbRun(`INSERT INTO USER (username, password_hash, full_name, role, associated_dept_id) VALUES (?, ?, ?, ?, ?)`,
+            ['president_admin', 'hash_password_123', "פרופ' תמר רז נחום", 'PRESIDENT', null]
+        );
+
+        const academicTitles = ["ד\"ר", "פרופ'"];
+        
+        // ב. הזרקת ראש בית ספר 1
+        const schoolHead1Name = `${faker.helpers.arrayElement(academicTitles)} ${faker.person.fullName()}`;
+        await dbRun(`INSERT INTO USER (username, password_hash, full_name, role, associated_dept_id) VALUES (?, ?, ?, ?, ?)`,
+            ['school_head_1', 'hash_password_123', schoolHead1Name, 'SCHOOL_HEAD', null]
+        );
+
+        // ג. הזרקת ראש בית ספר 2
+        const schoolHead2Name = `${faker.helpers.arrayElement(academicTitles)} ${faker.person.fullName()}`;
+        await dbRun(`INSERT INTO USER (username, password_hash, full_name, role, associated_dept_id) VALUES (?, ?, ?, ?, ?)`,
+            ['school_head_2', 'hash_password_123', schoolHead2Name, 'SCHOOL_HEAD', null]
+        );
+        
+        // ד. הזרקת ראשי המחלקות - לוקח אוטומטית מהמערך departments
+        for (const dept of departments) {
+            const deptId = dept[0];     
+            const deptHeadName = dept[2]; 
+
+            await dbRun(`INSERT INTO USER (username, password_hash, full_name, role, associated_dept_id) VALUES (?, ?, ?, ?, ?)`,
+                [`dept_head_${deptId}`, 'hash_password_123', deptHeadName, 'DEPT_HEAD', deptId]
+            );
+        }
+
         await dbRun("COMMIT");
-        console.log("Success! Data is saved in university.db");
+        console.log("🔥 Success! Data and users with strict school scopes successfully saved.");
 
     } catch (err) {
         await dbRun("ROLLBACK");
-        console.error("Error:", err);
+        console.error("🚨 Transaction failed, rolled back changes. Error:", err);
     } finally {
         await dbClose();
     }
