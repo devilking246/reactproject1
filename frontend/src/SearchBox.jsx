@@ -33,11 +33,12 @@ const SearchBox = () => {
                 - role can be 'PRESIDENT', 'SCHOOL_HEAD', or 'DEPT_HEAD'.
                 - associated_dept_id is only filled if role is 'DEPT_HEAD'.
 
-            CRITICAL INSTRUCTIONS:
-                - Convert this user request into SQLite code: "${query}".
-                - Return ONLY the executable SQL code block. Do NOT include markdown blocks (\`\`\`sql) or explanations.`;
+        CRITICAL INSTRUCTIONS:
+            - Convert this user request into SQLite code: "${query}".
+            - ACADEMIC COMPLETION RULE: A student has finished their academic duties ("סיים חובות") if the count of unique courses they passed (grade >= 55) equals the total count of courses required in their PROGRAM (from CURRICULUM_COURSE).
+            - Return ONLY the executable SQL code block. Do NOT include markdown blocks (\`\`\`sql) or explanations.`;;
         
-            try {
+        try {
             const response = await fetch(url, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
