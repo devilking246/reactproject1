@@ -25,31 +25,40 @@ app.post('/execute-sql', async (req, res) => {
     
     try {
         const results = await db.all(sql);
-        res.json(results);
+        // מחזירים אובייקט שמכיל גם את השאילתה שבוצעה וגם את התוצאות
+        res.json({ sql: sql, results: results });
     } catch (error) {
         res.status(400).json({ error: "שגיאה בהרצת השאילתה: " + error.message });
     }
 });
 
 app.post('/api/login', async (req, res) => {
-    const { username, password } = req.body;
+    const { username: loginInput, password } = req.body; // הקלט מהטופס יכול להיות או מייל או יוזרניים
 
-    if (!username || !password) {
-        return res.status(400).json({ error: "נא למלא שם משתמש וסיסמה" });
+    if (!loginInput || !password) {
+        return res.status(400).json({ error: "נא למלא שם משתמש/אימייל וסיסמה" });
     }
 
     try {
-        const sql = `SELECT user_id, username, full_name, role, associated_dept_id, password_hash FROM USER WHERE username = ?`;
-        const user = await db.get(sql, [username]);
+        // שאילתה הגמישה: מחפשת התאמה בשדה username או בשדה email
+        const sql = `SELECT user_id, username, email, full_name, role, associated_dept_id, password_hash 
+                     FROM USER 
+                     WHERE username = ? OR email = ?`;
+        
+        // אנו שולחים את loginInput פעמיים - פעם עבור ה-username ופעם עבור ה-email
+        const user = await db.get(sql, [loginInput, loginInput]);
 
+        // בדיקה 1: האם נמצא משתמש כלשהו?
         if (!user) {
-            return res.status(401).json({ error: "שם משתמש או סיסמה שגויים" });
+            return res.status(401).json({ error: "פרטי התחברות שגויים" });
         }
 
+        // בדיקה 2: האם הסיסמה תואמת?
         if (user.password_hash !== password) {
-            return res.status(401).json({ error: "שם משתמש או סיסמה שגויים" });
+            return res.status(401).json({ error: "פרטי התחברות שגויים" });
         }
 
+        // מחיקת הסיסמה מהאובייקט מטעמי אבטחה
         delete user.password_hash;
 
         res.json({

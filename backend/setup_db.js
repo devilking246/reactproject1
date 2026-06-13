@@ -110,6 +110,7 @@ async function setup() {
         await dbRun(`CREATE TABLE IF NOT EXISTS USER (
             user_id INTEGER PRIMARY KEY AUTOINCREMENT,
             username TEXT UNIQUE,
+            email TEXT UNIQUE,
             password_hash TEXT, 
             full_name TEXT,
             role TEXT,                  
@@ -244,24 +245,24 @@ async function setup() {
 
         // 9. הזרקת משתמשי המערכת
         console.log("Seeding system users...");
-
+        const defaultPassword = '123456'; // הסיסמה הזמנית האחידה לכולם
         // א. הזרקת נשיאת המכללה
-        await dbRun(`INSERT INTO USER (username, password_hash, full_name, role, associated_dept_id) VALUES (?, ?, ?, ?, ?)`,
-            ['president_admin', 'hash_password_123', "פרופ' תמר רז נחום", 'PRESIDENT', null]
+        await dbRun(`INSERT INTO USER (username, password_hash, email, full_name, role, associated_dept_id) VALUES (?, ?, ?, ?, ?, ?)`,
+            ['president_admin', defaultPassword, 'president@univ.ac.il', "פרופ' תמר רז נחום", 'PRESIDENT', null]
         );
 
         const academicTitles = ["ד\"ר", "פרופ'"];
         
         // ב. הזרקת ראש בית ספר 1
         const schoolHead1Name = `${faker.helpers.arrayElement(academicTitles)} ${faker.person.fullName()}`;
-        await dbRun(`INSERT INTO USER (username, password_hash, full_name, role, associated_dept_id) VALUES (?, ?, ?, ?, ?)`,
-            ['school_head_1', 'hash_password_123', schoolHead1Name, 'SCHOOL_HEAD', null]
+        await dbRun(`INSERT INTO USER (username, password_hash,email, full_name, role, associated_dept_id) VALUES (?, ?, ?, ?, ?, ?)`,
+            ['school_head_1', defaultPassword, 'school_head_1@univ.ac.il', schoolHead1Name, 'SCHOOL_HEAD', null]
         );
 
         // ג. הזרקת ראש בית ספר 2
         const schoolHead2Name = `${faker.helpers.arrayElement(academicTitles)} ${faker.person.fullName()}`;
-        await dbRun(`INSERT INTO USER (username, password_hash, full_name, role, associated_dept_id) VALUES (?, ?, ?, ?, ?)`,
-            ['school_head_2', 'hash_password_123', schoolHead2Name, 'SCHOOL_HEAD', null]
+        await dbRun(`INSERT INTO USER (username, password_hash, email, full_name, role, associated_dept_id) VALUES (?, ?, ?, ?, ?, ?)`,
+            ['school_head_2', defaultPassword, 'school_head_2@univ.ac.il', schoolHead2Name, 'SCHOOL_HEAD', null]
         );
         
         // ד. הזרקת ראשי המחלקות - לוקח אוטומטית מהמערך departments
@@ -269,8 +270,8 @@ async function setup() {
             const deptId = dept[0];     
             const deptHeadName = dept[2]; 
 
-            await dbRun(`INSERT INTO USER (username, password_hash, full_name, role, associated_dept_id) VALUES (?, ?, ?, ?, ?)`,
-                [`dept_head_${deptId}`, 'hash_password_123', deptHeadName, 'DEPT_HEAD', deptId]
+            await dbRun(`INSERT INTO USER (username, password_hash,email, full_name, role, associated_dept_id) VALUES (?, ?, ?, ?, ?, ?)`,
+                [`dept_head_${deptId}`, defaultPassword, `dept_head_${deptId}@univ.ac.il`, deptHeadName, 'DEPT_HEAD', deptId]
             );
         }
 
