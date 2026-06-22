@@ -1,5 +1,5 @@
 import { useState } from "react";
-require('dotenv').config();
+
 // 2. הגדרת המפתח (בשלב הפיתוח זה כאן, בהפקה זה יהיה ב-env)
 const SearchBox = () => {
     const [query, setQuery] = useState("");
@@ -14,11 +14,12 @@ const SearchBox = () => {
         setResult("");     // מנקה את ה-SQL הישן
         setDbData([]);     // מנקה את התוצאות הישנות מהקונסול/טבלה
         setLoading(true);
-        const API_KEY = process.env.GEMINI_API_KEY;
+
+        const API_KEY = "AIzaSyDhzSHSLh3YCk2BATDTPVDJqRODBqs83Oc";
 
         // זה ה-URL המדויק לפי המודל שמצאת ברשימה:
-            const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${process.env.GEMINI_API_KEY}`;
-            const systemPrompt = `You are a SQL Expert. Your task is to convert natural language queries into accurate SQLite queries based on the database schema below.
+// החלף את ה-URL לזה:
+const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${import.meta.env.VITE_GEMINI_API_KEY}`;            const systemPrompt = `You are a SQL Expert. Your task is to convert natural language queries into accurate SQLite queries based on the database schema below.
 
             DATABASE SCHEMA:
             1. DEPARTMENT (dept_id PK [int], name [string], head_of_dept [string], school_head_username NULL [string])

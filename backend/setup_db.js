@@ -238,7 +238,7 @@ async function setup() {
             const myCourseIds = faker.helpers.arrayElements([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15], { min: 3, max: 5 });
             for (const semCourseId of myCourseIds) {
                 await dbRun(`INSERT OR IGNORE INTO ENROL VALUES (?, ?, ?)`, 
-                    [sId, semCourseId, faker.number.int({ min: 55, max: 100 })]
+                    [sId, semCourseId, faker.number.int({ min: 0, max: 100 })]
                 );
             }
         }
