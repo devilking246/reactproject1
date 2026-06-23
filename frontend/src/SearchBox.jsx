@@ -38,8 +38,8 @@ const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-
         CRITICAL INSTRUCTIONS:
             - Convert this user request into SQLite code: "${query}".
             - ACADEMIC COMPLETION RULE: A student has finished their academic duties ("סיים חובות") if the count of unique courses they passed (grade >= 55) equals the total count of courses required in their PROGRAM (from CURRICULUM_COURSE).
-            - Return ONLY the executable SQL code block. Do NOT include markdown blocks (\`\`\`sql) or explanations.`;;
-        
+            - Return ONLY the executable SQL code block. Do NOT include markdown blocks (\`\`\`sql) or explanations.`
+
         try {
             const response = await fetch(url, {
                 method: "POST",
@@ -76,7 +76,9 @@ const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-
             const response = await fetch('http://localhost:5000/execute-sql', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ sql: sql })
+                body: JSON.stringify({ 
+                    sql: sql
+                })
             });
             const data = await response.json();
             
