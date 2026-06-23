@@ -1,54 +1,54 @@
 import { useState } from "react";
 import Login from "./Login";
 import SearchBox from "./SearchBox";
+import "./App.css"; // 🌟 ייבוא ה-CSS המעוצב
 
 function App() {
-    const [user, setUser] = useState(null); // מחזיק את המשתמש המחובר כרגע
+    const [user, setUser] = useState(null);
 
     const handleLoginSuccess = (loggedInUser) => {
-        setUser(loggedInUser); // שומר את המשתמש ומעביר אותו למערכת
+        setUser(loggedInUser);
     };
 
     const handleLogout = () => {
-        setUser(null); // התנתקות מהמערכת
+        setUser(null);
     };
 
-return (
-    // 🌟 שינוי כאן: הוספת סגנון שגורם לקונטיינר לתפוס 100% רוחב ללא שוליים חונקים
-    <div className="app-container" style={{ width: "100vw", maxWidth: "100%", padding: "0 20px", boxSizing: "border-box" }}>
-        {!user ? (
-            // אם המשתמש לא מחובר - מציגים רק מסך לוגין
-            <Login onLoginSuccess={handleLoginSuccess} />
-        ) : (
-            // אם המשתמש מחובר - נפתחת המערכת עם מנגנון השאילתות
-            <div style={{ padding: "20px", direction: "rtl", width: "100%" }}>
-                <header style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "2px solid #eee", paddingBottom: "10px", marginBottom: "20px" }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: "15px" }}>
+    if (!user) {
+        return <Login onLoginSuccess={handleLoginSuccess} />;
+    }
+
+    return (
+        <div className="app-container">
+            <div className="main-dashboard">
+                <header className="main-header">
+                    <div style={{ display: "flex", alignItems: "center", gap: "20px" }}>
                         <img 
                             src="/AzrieliJerus.svg.png" 
                             alt="לוגו עזריאלי" 
-                            style={{ height: "60px", objectFit: "contain" }} 
+                            className="login-logo"
+                            style={{ height: "55px", marginBottom: 0 }} 
                         />
-                        <div style={{ fontSize: "16px" }}>
-                            שלום, <strong>{user.full_name}</strong> ({
-                                user.role === 'ADMIN' ? "מנהל מערכת" :
-                                user.role === 'PRESIDENT' ? "נשיאת המכללה" : 
-                                user.role === 'SCHOOL_HEAD' ? "ראש בית ספר" : 
-                                "ראש מחלקה"
-                            })
+                        <div style={{ fontSize: "18px", fontWeight: "600" }}>
+                            שלום, {user.full_name} 
+                            <span className="user-badge">
+                            {user.role === 'ADMIN' ? "מנהל מערכת" :
+                            user.role === 'PRESIDENT' ? "נשיאת המכללה" : 
+                            user.role === 'SCHOOL_HEAD' ? "ראש בית ספר" : 
+                            user.role === 'DEPT_HEAD' ? "ראש מחלקה" : "משתמש מערכת"}
+                        </span>
                         </div>
                     </div>
-                    <button onClick={handleLogout} style={{ padding: "8px 15px", backgroundColor: "#dc3545", color: "white", border: "none", borderRadius: "4px", cursor: "pointer", fontWeight: "bold" }}>
-                        התנתק
+                    <button onClick={handleLogout} className="btn-danger">
+                        התנתק מהמערכת
                     </button>
                 </header>
                 
-                {/* קומפוננטת החיפוש תתפרס עכשיו על כל הרוחב הזמין */}
+                {/* תיבת החיפוש והתוצאות */}
                 <SearchBox currentUser={user} /> 
             </div>
-        )}
-    </div>
-);
+        </div>
+    );
 }
 
 export default App;

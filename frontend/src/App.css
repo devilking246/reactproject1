@@ -1,70 +1,107 @@
-/* איפוס בסיסי */
-html, body {
+@import url('https://fonts.googleapis.com/css2?family=Assistant:wght@300;400;600;700&display=swap');
+
+:root {
+    --primary-color: #0d47a1;
+    --primary-hover: #1565c0;
+    --danger-color: #d32f2f;
+    --background-gray: #f4f6f9;
+    --text-main: #212529;
+    --border-color: #e0e0e0;
+    --shadow-soft: 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+
+body {
+    font-family: 'Assistant', sans-serif;
+    background-color: var(--background-gray);
+    color: var(--text-main);
     margin: 0;
     padding: 0;
-    width: 100%;
-    height: 100%;
-    font-family: Arial, sans-serif;
-    background-color: #ffffff; /* רקע רגיל לכל השאר */
-    direction: rtl;
-}
-
-/* Header כחול בלבד */
-.header {
-    position: fixed;
-    top: 0;
-    right: 0;
-    width: 100%;
-    height: 60px;
-    background-color: #1e90ff;
-    color: white;
-    display: flex;
-    align-items: center;
-    padding-right: 20px;
-    font-size: 18px;
-    font-weight: bold;
     box-sizing: border-box;
-    z-index: 1000;
+    display: flex;
+    justify-content: center; /* ממרכז את כל האפליקציה גלובלית */
+    min-height: 100vh;
 }
 
-/* תוכן האפליקציה */
-.search-container {
-    margin-top: 60px; /* גובה ה-Header */
+/* קונטיינר העל הראשי של ה-React */
+#root {
+    width: 100%;
+}
+
+/* 🌟 עטיפת האפליקציה כולה */
+.app-container {
+    width: 100%;
+    min-height: 100vh;
     display: flex;
     flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    min-height: calc(100vh - 60px);
-    background-color: #ffffff; /* ללא כחול */
+    align-items: center; /* ממרכז את התוכן אופקית */
+    box-sizing: border-box;
 }
 
-/* חיפוש */
-.search-form {
+/* 🌟 מסך התחברות - ממורכז לחלוטין (אנכי ואופקי) */
+.login-wrapper {
     display: flex;
-    gap: 10px;
+    justify-content: center;
+    align-items: center;
+    width: 100%;
+    min-height: 100vh; /* תופס את כל גובה המסך וממרכז אנכית */
+    background: linear-gradient(135deg, #0d47a1 0%, #1976d2 100%);
+    box-sizing: border-box;
+    padding: 20px;
 }
 
-.search-input {
-    width: 300px;
-    padding: 10px;
-    font-size: 16px;
-    text-align: right;
+.login-card {
+    background: white;
+    padding: 40px;
+    border-radius: 12px;
+    box-shadow: 0 10px 25px rgba(0,0,0,0.15);
+    width: 100%;
+    max-width: 420px;
+    text-align: center;
 }
 
-.search-button,
-.tables-button {
-    padding: 10px 16px;
-    font-size: 16px;
+/* 🌟 מסך הדשבורד הראשי (אחרי הלוגין) - יושב יפה במרכז */
+.main-dashboard {
+    background: white;
+    border-radius: 12px;
+    box-shadow: var(--shadow-soft);
+    padding: 30px;
+    width: 85%; /* לא רחב מדי ולא צר מדי - משאיר שוליים אלגנטיים */
+    max-width: 1300px; /* הגבלה למסכים גדולים שלא יימתח */
+    margin: 40px auto; /* מייצר מרווח מלמעלה וממרכז אופקית */
+    box-sizing: border-box;
+}
+
+/* עיצובים נוספים שיהיה יפה */
+.main-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 2px solid var(--background-gray);
+    padding-bottom: 15px;
+    margin-bottom: 25px;
+}
+
+.user-badge {
+    background-color: #e3f2fd;
+    color: #0d47a1;
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-weight: 600;
+    font-size: 14px;
+    margin-right: 10px;
+}
+
+.btn-danger {
+    padding: 10px 20px;
+    background-color: var(--danger-color);
+    color: white;
+    border: none;
+    border-radius: 6px;
+    font-weight: 600;
     cursor: pointer;
+    transition: background-color 0.2s;
 }
 
-.tables-button {
-    margin-top: 15px;
-}
-
-/* תוצאות */
-.search-result {
-    margin-top: 20px;
-    max-width: 700px;
-    white-space: pre-wrap;
+.btn-danger:hover {
+    background-color: #b71c1c;
 }

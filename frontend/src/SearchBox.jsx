@@ -113,45 +113,49 @@ const SearchBox = ({ currentUser }) => {
     };
 
 
-    return (
-        <div className="search-container">
-            <form onSubmit={handleSearch} className="search-form">
-                <input
-                    type="text"
-                    placeholder="הקלד חיפוש חופשי..."
-                    value={query}
-                    onChange={(e) => setQuery(e.target.value)}
-                    className="search-input"
-                    disabled={loading} // מונע שינוי בזמן טעינה
-                />
-                <button type="submit" className="search-button" disabled={loading}>
-                    {loading ? "מנתח..." : "חפש"}
-                </button>
-            </form>
+return (
+    <div className="search-component">
+        <form onSubmit={handleSearch} className="search-wrapper">
+            <input
+                type="text"
+                placeholder="מלל חופשי "
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                className="search-field"
+                disabled={loading}
+            />
+            <button type="submit" className="btn-search" disabled={loading}>
+                {loading ? "מנתח..." : "שאל את מסד הנתונים"}
+            </button>
+        </form>
 
-            {/* 🌟 הצגת הודעת שגיאה באדום במידה וקיימת (כמו שגיאה 429 או שרת כבוי) */}
-            {errorMessage && (
-                <div style={{ marginTop: '20px', padding: '12px', background: '#f8d7da', color: '#721c24', border: '1px solid #f5c6cb', borderRadius: '5px' }}>
-                    <strong>שים לב:</strong> {errorMessage}
-                </div>
-            )}
-            {/* 🌟 שינוי כאן: הצגת השאילתה שבוצעה - אך ורק למנהל המערכת ADMIN */}
-            {currentUser && currentUser.role === 'ADMIN' && executedSql && (
-                <div style={{ marginTop: '20px', padding: '15px', background: '#e9ecef', borderRadius: '5px', direction: 'ltr', textAlign: 'left', borderLeft: '5px solid #007bff' }}>
-                    <strong>SQL Query Executed (Admin View Only):</strong>
-                    <pre style={{ marginTop: '10px', whiteSpace: 'pre-wrap' }}><code>{executedSql}</code></pre>
-                </div>
-            )}
+        {/* הודעות שגיאה */}
+        {errorMessage && (
+            <div className="alert-box">
+                <strong>שגיאה במערכת:</strong> {errorMessage}
+            </div>
+        )}
 
-            {/* הצגת הטבלה של הנתונים מה-DB */}
-            {dbData.length > 0 ? (
-                <div className="results-table" style={{ marginTop: '20px', overflowX: 'auto' }}>
-                    <h3>תוצאות:</h3>
-                    <table border="1" style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'right' }}>
+        {/* תצוגת מנהל מערכת ADMIN - תיבת קוד SQL כהה ומקצועית */}
+        {currentUser && currentUser.role === 'ADMIN' && executedSql && (
+            <div className="admin-sql-box">
+                <div style={{ color: '#61afef', fontWeight: 'bold', marginBottom: '8px', fontFamily: 'sans-serif', direction: 'rtl', textAlign: 'right' }}>
+                    🔧 תצוגת מנהל מערכת - שאילתת SQLite שיוצרה:
+                </div>
+                <pre style={{ margin: 0, whiteSpace: 'pre-wrap' }}><code>{executedSql}</code></pre>
+            </div>
+        )}
+
+        {/* טבלת תוצאות */}
+        {dbData.length > 0 ? (
+            <div style={{ marginTop: '25px' }}>
+                <h3 style={{ fontSize: '18px', marginBottom: '12px', fontWeight: '700' }}>תוצאות השאילתה מהמסד:</h3>
+                <div className="table-container">
+                    <table className="custom-table">
                         <thead>
                             <tr>
                                 {Object.keys(dbData[0]).map((key) => (
-                                    <th key={key} style={{ padding: '8px', background: '#f2f2f2' }}>{key}</th>
+                                    <th key={key}>{key}</th>
                                 ))}
                             </tr>
                         </thead>
@@ -159,8 +163,8 @@ const SearchBox = ({ currentUser }) => {
                             {dbData.map((row, index) => (
                                 <tr key={index}>
                                     {Object.values(row).map((val, i) => (
-                                        <td key={i} style={{ padding: '8px', border: '1px solid #ddd' }}>
-                                            {val !== null && val !== undefined ? val.toString() : ""}
+                                        <td key={i}>
+                                            {val !== null && val !== undefined ? val.toString() : "-"}
                                         </td>
                                     ))}
                                 </tr>
@@ -168,11 +172,15 @@ const SearchBox = ({ currentUser }) => {
                         </tbody>
                     </table>
                 </div>
-            ) : (
-                // הודעה ידידותית כשאין נתונים (אופציונלי)
-                !loading && executedSql && <p style={{ marginTop: '20px' }}>השאילתה רצה בהצלחה, אך לא נמצאו רשומות מתאימות בבסיס הנתונים.</p>
-            )}
-        </div>
-    );
+            </div>
+        ) : (
+            !loading && executedSql && !errorMessage && (
+                <p style={{ marginTop: '20px', color: '#6c757d', fontStyle: 'italic' }}>
+                    השאילתה רצה בהצלחה, אך לא נמצאו רשומות תואמות.
+                </p>
+            )
+        )}
+    </div>
+);
 }
 export default SearchBox;
