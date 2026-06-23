@@ -5,11 +5,12 @@ const { promisify } = require('util');
 async function setup() {
     const db = new sqlite3.Database('./university.db');
     
-    // הפיכת הפונקציות של sqlite ל-Promises
+    // הפיכת כל הפונקציות של sqlite ל-Promises בצורה תקנית
     const dbRun = promisify(db.run.bind(db));
+    const dbAll = promisify(db.all.bind(db)); // <-- הוספנו תמיכה מלאה בבקשות SELECT
     const dbClose = promisify(db.close.bind(db));
 
-    // === שלב 0: ניקוי אגרסיבי של טבלאות ישנות (חובה כדי לרענן עמודות חדשות!) ===
+    // === שלב 0: ניקוי אגרסיבי של טבלאות ישנות ===
     try {
         await dbRun(`DROP TABLE IF EXISTS USER`);
         await dbRun(`DROP TABLE IF EXISTS ENROL`);
@@ -28,7 +29,7 @@ async function setup() {
     try {
         console.log("Creating tables...");
         
-        // 1. מחלקות - מעודכן עם עמודת שיוך לראש בית ספר
+        // 1. מחלקות
         await dbRun(`CREATE TABLE IF NOT EXISTS DEPARTMENT (
             dept_id INTEGER PRIMARY KEY, 
             name TEXT, 
@@ -72,7 +73,7 @@ async function setup() {
             FOREIGN KEY(dept_id) REFERENCES DEPARTMENT(dept_id)
         )`);
 
-        // 6. קורסים שמתקיימים בפועל בסמסטר ספציפי (כולל מועדי בחינות)
+        // 6. קורסים שמתקיימים בפועל
         await dbRun(`CREATE TABLE IF NOT EXISTS SEMESTER_COURSE (
             semester_course_id INTEGER PRIMARY KEY AUTOINCREMENT,
             course_num INTEGER,
@@ -106,7 +107,7 @@ async function setup() {
             FOREIGN KEY(semester_course_id) REFERENCES SEMESTER_COURSE(semester_course_id)
         )`);
 
-        // 9. משתמשי המערכת והרשאות גישה (Roles) - גרסה נקייה
+        // 9. משתמשי המערכת והרשאות
         await dbRun(`CREATE TABLE IF NOT EXISTS USER (
             user_id INTEGER PRIMARY KEY AUTOINCREMENT,
             username TEXT UNIQUE,
@@ -121,7 +122,6 @@ async function setup() {
         console.log("Seeding data...");
         await dbRun("BEGIN TRANSACTION");
 
-        // הגדרת מערך המחלקות עם שיוך מפורש לראש בית ספר (לפי ה-username שלו)
         const departments = [
             [101, 'הנדסת תוכנה', "פרופ' אברהם כהן", 'school_head_1'],
             [102, 'מדעי המחשב', 'ד"ר מיכל לוי', 'school_head_1'],
@@ -129,12 +129,10 @@ async function setup() {
             [104, 'הנדסת תעשייה וניהול', 'ד"ר דוד ישראלי', 'school_head_2']
         ];
 
-        // 1. הזרקת מחלקות קבועות (4 ערכים לעמודות המעודכנות)
         for (const dept of departments) {
             await dbRun(`INSERT OR IGNORE INTO DEPARTMENT VALUES (?, ?, ?, ?)`, dept);
         }
 
-        // 2. הזרקת תוכניות הלימודים
         const programs = [
             ['PROG_SOFTWARE', 'תוכנית לימודים בהנדסת תוכנה', 101],
             ['PROG_CS', 'תוכנית לימודים במדעי המחשב', 102],
@@ -145,7 +143,6 @@ async function setup() {
             await dbRun(`INSERT OR IGNORE INTO PROGRAM VALUES (?, ?, ?)`, prog);
         }
 
-        // 3. בנק קורסים קבוע (40 קורסים)
         const sampleCourses = [
             [10003, 'SE10003', 'אלגברה לינארית 1'], [10124, 'SE10124', 'מבוא לחדו"א'],
             [10151, 'SE10151', 'מבוא לתכנות'], [10152, 'SE10152', 'מתמטיקה בדידה 1'],
@@ -174,7 +171,6 @@ async function setup() {
             await dbRun(`INSERT OR IGNORE INTO COURSE VALUES (?, ?, ?)`, course);
         }
 
-        // 4. שיבוץ קורסים בתוכניות הלימודים
         for (let i = 0; i < sampleCourses.length; i++) {
             let progId = 'PROG_SOFTWARE';
             if (i >= 10 && i < 18) progId = 'PROG_CS';
@@ -192,7 +188,6 @@ async function setup() {
             );
         }
 
-        // 5. מרצים (שמות נקיים בלבד)
         const lecturerIds = [];
         const deptIds = [101, 102, 103, 104];
         for (let i = 0; i < 12; i++) {
@@ -204,18 +199,22 @@ async function setup() {
             );
         }
 
-        // 7. סטודנטים
+        // יצירת 150 סטודנטים
         const studentIds = [];
         const programIds = ['PROG_SOFTWARE', 'PROG_CS', 'PROG_ELEC', 'PROG_INDUSTRIAL'];
-        for (let i = 0; i < 40; i++) {
+        
+        for (let i = 0; i < 150; i++) { 
             const id = faker.string.numeric(9);
             studentIds.push(id);
+            const fullName = faker.person.fullName();
+            const assignedProgram = faker.helpers.arrayElement(programIds);
+            const startYear = faker.helpers.arrayElement([2021, 2022, 2023, 2024]);
+            
             await dbRun(`INSERT OR IGNORE INTO STUDENT VALUES (?, ?, ?, ?, ?, ?)`, 
-                [id, faker.person.fullName(), faker.helpers.arrayElement(programIds), 2024, 'A', 'Active']
+                [id, fullName, assignedProgram, startYear, 'A', 'Active']
             );
         }
 
-        // 6. קורסים סמסטריאליים בפועל (כולל תאריכי הבחינות)
         const semA_StartA = '2026-06-22', semA_EndA = '2026-07-15';
         const semA_StartB = '2026-07-20', semA_EndB = '2026-08-15';
         const semB_StartA = '2026-10-20', semB_EndA = '2026-11-12';
@@ -224,7 +223,6 @@ async function setup() {
         for (let i = 0; i < sampleCourses.length; i++) {
             const courseNum = sampleCourses[i][0];
             const semester = faker.helpers.arrayElement(['A', 'B']);
-            
             let dateA = semester === 'A' ? semA_StartA : semB_StartA;
             let dateB = semester === 'A' ? semA_StartB : semB_StartB;
 
@@ -233,44 +231,58 @@ async function setup() {
             );
         }
 
-        // 8. הרשמה וציונים (ENROL)
-        for (const sId of studentIds) {
-            const myCourseIds = faker.helpers.arrayElements([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15], { min: 3, max: 5 });
-            for (const semCourseId of myCourseIds) {
-                await dbRun(`INSERT OR IGNORE INTO ENROL VALUES (?, ?, ?)`, 
-                    [sId, semCourseId, faker.number.int({ min: 0, max: 100 })]
+        // 8. רישום סטודנטים לקורסים השייכים לתוכנית שלהם בלבד - מתוקן עם dbAll
+        console.log("Enrolling students into courses based on their program...");
+        const students = await dbAll(`SELECT ID, program_id FROM STUDENT`);
+
+        for (const student of students) {
+            const availableCourses = await dbAll(`
+                SELECT semester_course_id 
+                FROM SEMESTER_COURSE AS SC
+                JOIN CURRICULUM_COURSE AS CC ON SC.course_num = CC.course_num
+                WHERE CC.program_id = ?
+            `, [student.program_id]);
+
+            if (!availableCourses || availableCourses.length === 0) continue;
+
+            const numberOfCourses = faker.number.int({ min: 5, max: 7 });
+            const shuffled = faker.helpers.shuffle(availableCourses);
+            const selectedCourses = shuffled.slice(0, Math.min(numberOfCourses, availableCourses.length));
+
+            for (const course of selectedCourses) {
+                const grade = faker.number.int({ min: 40, max: 100 });
+                await dbRun(`INSERT OR IGNORE INTO ENROL (student_id, semester_course_id, grade) VALUES (?, ?, ?)`,
+                    [student.ID, course.semester_course_id, grade]
                 );
             }
         }
 
-        // 9. הזרקת משתמשי המערכת
-        console.log("Seeding system users...");
-        const defaultPassword = '123456'; // הסיסמה הזמנית האחידה לכולם
-        // א. הזרקת נשיאת המכללה
+        const defaultPassword = '123456';
+        
+        await dbRun(`INSERT INTO USER (username, password_hash, email, full_name, role, associated_dept_id) VALUES (?, ?, ?, ?, ?, ?)`,
+            ['admin_user', defaultPassword, 'admin@univ.ac.il', "דניאל מנהל המערכת", 'ADMIN', null]
+        );
         await dbRun(`INSERT INTO USER (username, password_hash, email, full_name, role, associated_dept_id) VALUES (?, ?, ?, ?, ?, ?)`,
             ['president_admin', defaultPassword, 'president@univ.ac.il', "פרופ' תמר רז נחום", 'PRESIDENT', null]
         );
 
         const academicTitles = ["ד\"ר", "פרופ'"];
         
-        // ב. הזרקת ראש בית ספר 1
         const schoolHead1Name = `${faker.helpers.arrayElement(academicTitles)} ${faker.person.fullName()}`;
-        await dbRun(`INSERT INTO USER (username, password_hash,email, full_name, role, associated_dept_id) VALUES (?, ?, ?, ?, ?, ?)`,
+        await dbRun(`INSERT INTO USER (username, password_hash, email, full_name, role, associated_dept_id) VALUES (?, ?, ?, ?, ?, ?)`,
             ['school_head_1', defaultPassword, 'school_head_1@univ.ac.il', schoolHead1Name, 'SCHOOL_HEAD', null]
         );
 
-        // ג. הזרקת ראש בית ספר 2
         const schoolHead2Name = `${faker.helpers.arrayElement(academicTitles)} ${faker.person.fullName()}`;
         await dbRun(`INSERT INTO USER (username, password_hash, email, full_name, role, associated_dept_id) VALUES (?, ?, ?, ?, ?, ?)`,
             ['school_head_2', defaultPassword, 'school_head_2@univ.ac.il', schoolHead2Name, 'SCHOOL_HEAD', null]
         );
         
-        // ד. הזרקת ראשי המחלקות - לוקח אוטומטית מהמערך departments
         for (const dept of departments) {
             const deptId = dept[0];     
             const deptHeadName = dept[2]; 
 
-            await dbRun(`INSERT INTO USER (username, password_hash,email, full_name, role, associated_dept_id) VALUES (?, ?, ?, ?, ?, ?)`,
+            await dbRun(`INSERT INTO USER (username, password_hash, email, full_name, role, associated_dept_id) VALUES (?, ?, ?, ?, ?, ?)`,
                 [`dept_head_${deptId}`, defaultPassword, `dept_head_${deptId}@univ.ac.il`, deptHeadName, 'DEPT_HEAD', deptId]
             );
         }
@@ -281,8 +293,6 @@ async function setup() {
     } catch (err) {
         await dbRun("ROLLBACK");
         console.error("🚨 Transaction failed, rolled back changes. Error:", err);
-    } finally {
-        await dbClose();
     }
 }
 

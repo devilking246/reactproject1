@@ -1,25 +1,28 @@
 import { useState } from "react";
 
 // 2. הגדרת המפתח (בשלב הפיתוח זה כאן, בהפקה זה יהיה ב-env)
-const SearchBox = () => {
+const SearchBox = ({ currentUser }) => {
     const [query, setQuery] = useState("");
     const [result, setResult] = useState("");
     const [loading, setLoading] = useState(false);
     const [dbData, setDbData] = useState([])
     const [executedSql, setExecutedSql] = useState("");
+    const [errorMessage, setErrorMessage] = useState("");
     const handleSearch = async (e) => {
         e.preventDefault();
         if (!query) return;
 
-        setResult("");     // מנקה את ה-SQL הישן
-        setDbData([]);     // מנקה את התוצאות הישנות מהקונסול/טבלה
+        setResult("");    
+        setDbData([]); 
+        setExecutedSql("");
+        setErrorMessage("");    
         setLoading(true);
 
         const API_KEY = "AIzaSyDhzSHSLh3YCk2BATDTPVDJqRODBqs83Oc";
 
         // זה ה-URL המדויק לפי המודל שמצאת ברשימה:
-// החלף את ה-URL לזה:
-const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${import.meta.env.VITE_GEMINI_API_KEY}`;            const systemPrompt = `You are a SQL Expert. Your task is to convert natural language queries into accurate SQLite queries based on the database schema below.
+        // החלף את ה-URL לזה:
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${import.meta.env.VITE_GEMINI_API_KEY}`;            const systemPrompt = `You are a SQL Expert. Your task is to convert natural language queries into accurate SQLite queries based on the database schema below.
 
             DATABASE SCHEMA:
             1. DEPARTMENT (dept_id PK [int], name [string], head_of_dept [string], school_head_username NULL [string])
@@ -38,7 +41,11 @@ const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-
         CRITICAL INSTRUCTIONS:
             - Convert this user request into SQLite code: "${query}".
             - ACADEMIC COMPLETION RULE: A student has finished their academic duties ("סיים חובות") if the count of unique courses they passed (grade >= 55) equals the total count of courses required in their PROGRAM (from CURRICULUM_COURSE).
-            - Return ONLY the executable SQL code block. Do NOT include markdown blocks (\`\`\`sql) or explanations.`
+            - COURSES REMAINING RULE (קורסים שנותרו להשלים): To find which courses a student has LEFT to complete, you must find all 'course_num' assigned to the student's program in CURRICULUM_COURSE, and EXCEPT (or use NOT IN) the 'course_num' from SEMESTER_COURSE joined with ENROL where the student_id matches and grade >= 55.
+            - To count HOW MANY courses are left, count the rows resulting from the logic above grouped by the student.
+            - Return ONLY the executable SQL code block. Do NOT include markdown blocks (\`\`\`sql) or explanations.
+            - When asked about students in a specific department, ALWAYS join the STUDENT table with the PROGRAM table, and filter by PROGRAM.dept_id or DEPARTMENT.dept_name.
+            - NEVER invent filters for 'lecturer_id' or 'course_num' unless the user explicitly mentions a lecturer or a specific course in their question.`
 
         try {
             const response = await fetch(url, {
@@ -50,34 +57,43 @@ const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-
                     }]
                 })
             });
-
-            const data = await response.json();
-
-            if (data.error) {
-                setResult(`שגיאת API: ${data.error.message}`);
-            } else if (data.candidates && data.candidates[0].content) {
-                const sqlText = data.candidates[0].content.parts[0].text;
-                // ניקוי סימני ה-Markdown
-                const cleanSql = data.candidates[0].content.parts[0].text.replace(/```sql|```/g, "").trim();
-                setResult(cleanSql);
-                await runQueryOnServer(cleanSql);
-            } else {
-                setResult("התקבלה תשובה ריקה מהמודל.");
+            // 🌟 בדיקה האם הגענו למגבלת בקשות (שגיאה 429)
+            if (response.status === 429) {
+                setErrorMessage("השירות עמוס כעת (שגיאה 429). אנא המתן דקה ונסה שוב.");
+                setLoading(false);
+                return;
             }
-        } catch (error) {
-            setResult("שגיאת תקשורת עם השרת.");
-            console.error(error);
-        } finally {
-            setLoading(false);
+            const data = await response.json();
+            
+            if (data.error) {
+            // טיפול בשגיאות פנימיות של ה-API
+            if (data.error.code === 429) {
+                setErrorMessage("השירות אינו זמין כעת עקב עומס בקשות. אנא נסה שוב בעוד רגע.");
+            } else {
+                setErrorMessage(`שגיאת API: ${data.error.message}`);
+            }
+        } else if (data.candidates && data.candidates[0].content) {
+            const cleanSql = data.candidates[0].content.parts[0].text.replace(/```sql|```/g, "").trim();
+            setResult(cleanSql);
+            await runQueryOnServer(cleanSql); // שליחה לשרת הלוקאלי
+        } else {
+            setErrorMessage("התקבלה תשובה ריקה מהמודל. נסה לנסח את השאלה אחרת.");
         }
-    };
+    } catch (error) {
+        setErrorMessage("שגיאת תקשורת עם שרת ה-AI. ודא שיש לך חיבור לאינטרנט.");
+        console.error(error);
+    } finally {
+        setLoading(false);
+    }
+};
    const runQueryOnServer = async (sql) => {
         try {
             const response = await fetch('http://localhost:5000/execute-sql', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ 
-                    sql: sql
+                    sql: sql,
+                    user: currentUser
                 })
             });
             const data = await response.json();
@@ -95,9 +111,7 @@ const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-
             console.error("Could not connect to Server:", error);
         }
     };
-    const handleShowTables = () => {
-        setResult(" כל הטבלאות: \n - Students\n - Courses\n - Grades\n - Professors");
-    };
+
 
     return (
         <div className="search-container">
@@ -108,20 +122,29 @@ const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-
                     value={query}
                     onChange={(e) => setQuery(e.target.value)}
                     className="search-input"
+                    disabled={loading} // מונע שינוי בזמן טעינה
                 />
-                <button type="submit" className="search-button">חפש</button>
+                <button type="submit" className="search-button" disabled={loading}>
+                    {loading ? "מנתח..." : "חפש"}
+                </button>
             </form>
 
-            {/* הצגת השאילתה שבוצעה */}
-            {executedSql && (
-                <div style={{ marginTop: '20px', padding: '10px', background: '#e9ecef', borderRadius: '5px', direction: 'ltr' }}>
-                    <strong>השאילתה שבוצעה:</strong>
-                    <pre><code>{executedSql}</code></pre>
+            {/* 🌟 הצגת הודעת שגיאה באדום במידה וקיימת (כמו שגיאה 429 או שרת כבוי) */}
+            {errorMessage && (
+                <div style={{ marginTop: '20px', padding: '12px', background: '#f8d7da', color: '#721c24', border: '1px solid #f5c6cb', borderRadius: '5px' }}>
+                    <strong>שים לב:</strong> {errorMessage}
+                </div>
+            )}
+            {/* 🌟 שינוי כאן: הצגת השאילתה שבוצעה - אך ורק למנהל המערכת ADMIN */}
+            {currentUser && currentUser.role === 'ADMIN' && executedSql && (
+                <div style={{ marginTop: '20px', padding: '15px', background: '#e9ecef', borderRadius: '5px', direction: 'ltr', textAlign: 'left', borderLeft: '5px solid #007bff' }}>
+                    <strong>SQL Query Executed (Admin View Only):</strong>
+                    <pre style={{ marginTop: '10px', whiteSpace: 'pre-wrap' }}><code>{executedSql}</code></pre>
                 </div>
             )}
 
             {/* הצגת הטבלה של הנתונים מה-DB */}
-            {dbData.length > 0 && (
+            {dbData.length > 0 ? (
                 <div className="results-table" style={{ marginTop: '20px', overflowX: 'auto' }}>
                     <h3>תוצאות:</h3>
                     <table border="1" style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'right' }}>
@@ -136,13 +159,18 @@ const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-
                             {dbData.map((row, index) => (
                                 <tr key={index}>
                                     {Object.values(row).map((val, i) => (
-                                        <td key={i} style={{ padding: '8px', border: '1px solid #ddd' }}>{val}</td>
+                                        <td key={i} style={{ padding: '8px', border: '1px solid #ddd' }}>
+                                            {val !== null && val !== undefined ? val.toString() : ""}
+                                        </td>
                                     ))}
                                 </tr>
                             ))}
                         </tbody>
                     </table>
                 </div>
+            ) : (
+                // הודעה ידידותית כשאין נתונים (אופציונלי)
+                !loading && executedSql && <p style={{ marginTop: '20px' }}>השאילתה רצה בהצלחה, אך לא נמצאו רשומות מתאימות בבסיס הנתונים.</p>
             )}
         </div>
     );
