@@ -21,31 +21,21 @@ let db;
 
 // 2. נקודת קצה להרצת השאילתות שה-AI מייצר
 app.post('/execute-sql', async (req, res) => {
-    // 🌟 שלב 1: מחלצים גם את ה-sql וגם את ה-user שנשלח מהקליאנט
-    const { sql, user } = req.body; 
-    
+    const { sql, user } = req.body;     
     if (!user) {
-        return res.status(401).json({ error: "משתמש לא מזוהה, הגישה למסד הנתונים נחסמה." });
+        return res.status(401).json({ error: "השרת לא קיבל את נתוני המשתמש מה-React." });
     }
 
     let finalSql = sql;
 
     try {
-        // 🌟 שלב 2: אם המשתמש הוא ראש מחלקה, נחליף את מחזיק המקום של ג'מיני בשם המשתמש האמיתי
-        if (user.role === 'DEPT_HEAD') {
-            finalSql = finalSql.replace(/'CURRENT_DEPT_HEAD_USERNAME'/g, `'${user.username}'`);
+        if (finalSql.includes('__CURRENT_DEPT_ID__')) {
+            finalSql = finalSql.replace(/__CURRENT_DEPT_ID__/g, user.associated_dept_id);
         }
-        
-        // אם תרצה בעתיד להוסיף חוקים ל-SCHOOL_HEAD, תוכל להוסיף אותם כאן בהמשך...
-
-        // 🌟 שלב 3: מריצים את השאילתה המעודכנת (finalSql) על מסד הנתונים
         const results = await db.all(finalSql);
-        
-        // מחזירים את התוצאות ואת השאילתה המעודכנת כדי שה-ADMIN יוכל לראות אותה בתיבה הכהה
         res.json({ sql: finalSql, results: results });
 
     } catch (error) {
-        // טיפול בשגיאות במידה וה-SQL שנבנה אינו תקין
         res.status(400).json({ error: "שגיאה בהרצת השאילתה: " + error.message });
     }
 });

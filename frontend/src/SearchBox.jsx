@@ -18,11 +18,12 @@ const SearchBox = ({ currentUser }) => {
         setErrorMessage("");    
         setLoading(true);
 
-        const API_KEY = "AIzaSyDhzSHSLh3YCk2BATDTPVDJqRODBqs83Oc";
+        
 
         // זה ה-URL המדויק לפי המודל שמצאת ברשימה:
         // החלף את ה-URL לזה:
-        const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${import.meta.env.VITE_GEMINI_API_KEY}`;            const systemPrompt = `You are a SQL Expert. Your task is to convert natural language queries into accurate SQLite queries based on the database schema below.
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${import.meta.env.VITE_GEMINI_API_KEY}`;            
+        const systemPrompt = `You are a SQL Expert. Your task is to convert natural language queries into accurate SQLite queries based on the database schema below.
 
             DATABASE SCHEMA:
             1. DEPARTMENT (dept_id PK [int], name [string], head_of_dept [string], school_head_username NULL [string])
@@ -45,7 +46,10 @@ const SearchBox = ({ currentUser }) => {
             - To count HOW MANY courses are left, count the rows resulting from the logic above grouped by the student.
             - Return ONLY the executable SQL code block. Do NOT include markdown blocks (\`\`\`sql) or explanations.
             - When asked about students in a specific department, ALWAYS join the STUDENT table with the PROGRAM table, and filter by PROGRAM.dept_id or DEPARTMENT.dept_name.
-            - NEVER invent filters for 'lecturer_id' or 'course_num' unless the user explicitly mentions a lecturer or a specific course in their question.`
+            - NEVER invent filters for 'lecturer_id' or 'course_num' unless the user explicitly mentions a lecturer or a specific course in their question.
+            -Whenever the user asks for data related to "my department" (המחלקה שלי), you must filter the query using the exact placeholder text __CURRENT_DEPT_ID__.
+            Do not use subqueries or invent column names for the user. 
+            Example usage: WHERE T2.dept_id = __CURRENT_DEPT_ID__`
 
         try {
             const response = await fetch(url, {
