@@ -1,13 +1,13 @@
 import { useState } from "react";
 
-// 2. הגדרת המפתח (בשלב הפיתוח זה כאן, בהפקה זה יהיה ב-env)
 const SearchBox = ({ currentUser }) => {
     const [query, setQuery] = useState("");
     const [result, setResult] = useState("");
     const [loading, setLoading] = useState(false);
-    const [dbData, setDbData] = useState([])
+    const [dbData, setDbData] = useState([]);
     const [executedSql, setExecutedSql] = useState("");
     const [errorMessage, setErrorMessage] = useState("");
+
     const handleSearch = async (e) => {
         e.preventDefault();
         if (!query) return;
@@ -18,10 +18,6 @@ const SearchBox = ({ currentUser }) => {
         setErrorMessage("");    
         setLoading(true);
 
-        
-
-        // זה ה-URL המדויק לפי המודל שמצאת ברשימה:
-        // החלף את ה-URL לזה:
         const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${import.meta.env.VITE_GEMINI_API_KEY}`;            
         const systemPrompt = `You are a SQL Expert. Your task is to convert natural language queries into accurate SQLite queries based on the database schema below.
 
@@ -49,7 +45,7 @@ const SearchBox = ({ currentUser }) => {
             - NEVER invent filters for 'lecturer_id' or 'course_num' unless the user explicitly mentions a lecturer or a specific course in their question.
             -Whenever the user asks for data related to "my department" (המחלקה שלי), you must filter the query using the exact placeholder text __CURRENT_DEPT_ID__.
             Do not use subqueries or invent column names for the user. 
-            Example usage: WHERE T2.dept_id = __CURRENT_DEPT_ID__`
+            Example usage: WHERE T2.dept_id = __CURRENT_DEPT_ID__`;
 
         try {
             const response = await fetch(url, {
@@ -61,7 +57,7 @@ const SearchBox = ({ currentUser }) => {
                     }]
                 })
             });
-            // 🌟 בדיקה האם הגענו למגבלת בקשות (שגיאה 429)
+            
             if (response.status === 429) {
                 setErrorMessage("השירות עמוס כעת (שגיאה 429). אנא המתן דקה ונסה שוב.");
                 setLoading(false);
@@ -70,27 +66,27 @@ const SearchBox = ({ currentUser }) => {
             const data = await response.json();
             
             if (data.error) {
-            // טיפול בשגיאות פנימיות של ה-API
-            if (data.error.code === 429) {
-                setErrorMessage("השירות אינו זמין כעת עקב עומס בקשות. אנא נסה שוב בעוד רגע.");
+                if (data.error.code === 429) {
+                    setErrorMessage("השירות אינו זמין כעת עקב עומס בקשות. אנא נסה שוב בעוד רגע.");
+                } else {
+                    setErrorMessage(`שגיאת API: ${data.error.message}`);
+                }
+            } else if (data.candidates && data.candidates[0].content) {
+                const cleanSql = data.candidates[0].content.parts[0].text.replace(/```sql|```/g, "").trim();
+                setResult(cleanSql);
+                await runQueryOnServer(cleanSql); 
             } else {
-                setErrorMessage(`שגיאת API: ${data.error.message}`);
+                setErrorMessage("התקבלה תשובה ריקה מהמודל. נסה לנסח את השאלה אחרת.");
             }
-        } else if (data.candidates && data.candidates[0].content) {
-            const cleanSql = data.candidates[0].content.parts[0].text.replace(/```sql|```/g, "").trim();
-            setResult(cleanSql);
-            await runQueryOnServer(cleanSql); // שליחה לשרת הלוקאלי
-        } else {
-            setErrorMessage("התקבלה תשובה ריקה מהמודל. נסה לנסח את השאלה אחרת.");
+        } catch (error) {
+            setErrorMessage("שגיאת תקשורת עם שרת ה-AI. ודא שיש לך חיבור לאינטרנט.");
+            console.error(error);
+        } finally {
+            setLoading(false);
         }
-    } catch (error) {
-        setErrorMessage("שגיאת תקשורת עם שרת ה-AI. ודא שיש לך חיבור לאינטרנט.");
-        console.error(error);
-    } finally {
-        setLoading(false);
-    }
-};
-   const runQueryOnServer = async (sql) => {
+    };
+
+    const runQueryOnServer = async (sql) => {
         try {
             const response = await fetch('http://localhost:5000/execute-sql', {
                 method: 'POST',
@@ -105,86 +101,97 @@ const SearchBox = ({ currentUser }) => {
             if (data.error) {
                 console.error("Database Error:", data.error);
             } else {
-                console.log("✅ השאילתה שבוצעה:", data.sql);
-                console.table(data.results);
-                
-                setExecutedSql(data.sql); // שמירת השאילתה ל-State
-                setDbData(data.results);  // שמירת התוצאות ל-State
+                setExecutedSql(data.sql); 
+                setDbData(data.results);  
             }
         } catch (error) {
             console.error("Could not connect to Server:", error);
         }
     };
 
+    return (
+        <div className="search-component" style={{ direction: "rtl", textAlign: "right", width: "100%" }}>
+            
+            {/* 🌟 עטיפת החיפוש - מוגבלת לחצי מסך (50vw) וממורכזת לימין */}
+            <form onSubmit={handleSearch} style={{ display: "flex", gap: "10px", width: "50vw", direction: "rtl", marginBottom: "25px" }}>
+                <input
+                    type="text"
+                    placeholder="שאל את מסד הנתונים במלל חופשי..."
+                    value={query}
+                    onChange={(e) => setQuery(e.target.value)}
+                    style={{
+                        flex: 1,
+                        padding: "14px 20px",
+                        fontSize: "16px",
+                        direction: "rtl",
+                        textAlign: "right",
+                        unicodeBidi: "plaintext",
+                        borderRadius: "8px",
+                        border: "1px solid #ccc",
+                        whiteSpace: "nowrap",       /* 🌟 מונע ירידת שורה */
+                        overflowX: "auto",          /* 🌟 מאפשר גלילה אופקית בתוך התיבה בטקסט ארוך */
+                        boxSizing: "border-box"
+                    }}
+                    disabled={loading}
+                />
+                <button type="submit" className="btn-search" disabled={loading} style={{ whiteSpace: "nowrap" }}>
+                    {loading ? "מנתח..." : "שאל את ה-DB"}
+                </button>
+            </form>
 
-return (
-    <div className="search-component">
-        <form onSubmit={handleSearch} className="search-wrapper">
-            <input
-                type="text"
-                placeholder="מלל חופשי "
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                className="search-field"
-                disabled={loading}
-            />
-            <button type="submit" className="btn-search" disabled={loading}>
-                {loading ? "מנתח..." : "שאל את מסד הנתונים"}
-            </button>
-        </form>
-
-        {/* הודעות שגיאה */}
-        {errorMessage && (
-            <div className="alert-box">
-                <strong>שגיאה במערכת:</strong> {errorMessage}
-            </div>
-        )}
-
-        {/* תצוגת מנהל מערכת ADMIN - תיבת קוד SQL כהה ומקצועית */}
-        {currentUser && currentUser.role === 'ADMIN' && executedSql && (
-            <div className="admin-sql-box">
-                <div style={{ color: '#61afef', fontWeight: 'bold', marginBottom: '8px', fontFamily: 'sans-serif', direction: 'rtl', textAlign: 'right' }}>
-                    🔧 תצוגת מנהל מערכת - שאילתת SQLite שיוצרה:
+            {/* הודעות שגיאה */}
+            {errorMessage && (
+                <div className="alert-box">
+                    <strong>שגיאה במערכת:</strong> {errorMessage}
                 </div>
-                <pre style={{ margin: 0, whiteSpace: 'pre-wrap' }}><code>{executedSql}</code></pre>
-            </div>
-        )}
+            )}
 
-        {/* טבלת תוצאות */}
-        {dbData.length > 0 ? (
-            <div style={{ marginTop: '25px' }}>
-                <h3 style={{ fontSize: '18px', marginBottom: '12px', fontWeight: '700' }}>תוצאות השאילתה מהמסד:</h3>
-                <div className="table-container">
-                    <table className="custom-table">
-                        <thead>
-                            <tr>
-                                {Object.keys(dbData[0]).map((key) => (
-                                    <th key={key}>{key}</th>
-                                ))}
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {dbData.map((row, index) => (
-                                <tr key={index}>
-                                    {Object.values(row).map((val, i) => (
-                                        <td key={i}>
-                                            {val !== null && val !== undefined ? val.toString() : "-"}
-                                        </td>
+            {/* תצוגת מנהל מערכת ADMIN */}
+            {currentUser && currentUser.role === 'ADMIN' && executedSql && (
+                <div className="admin-sql-box">
+                    <div style={{ color: '#61afef', fontWeight: 'bold', marginBottom: '8px', fontFamily: 'sans-serif', direction: 'rtl', textAlign: 'right' }}>
+                        🔧 תצוגת מנהל מערכת - שאילתת SQLite שיוצרה:
+                    </div>
+                    <pre style={{ margin: 0, whiteSpace: 'pre-wrap' }}><code>{executedSql}</code></pre>
+                </div>
+            )}
+
+            {/* טבלת תוצאות מהמסד */}
+            {dbData.length > 0 ? (
+                <div style={{ marginTop: '25px', width: "100%" }}>
+                    <h3 style={{ fontSize: '18px', marginBottom: '12px', fontWeight: '700' }}>תוצאות השאילתה מהמסד:</h3>
+                    <div className="table-container">
+                        <table className="custom-table">
+                            <thead>
+                                <tr>
+                                    {Object.keys(dbData[0]).map((key) => (
+                                        <th key={key}>{key}</th>
                                     ))}
                                 </tr>
-                            ))}
-                        </tbody>
-                    </table>
+                            </thead>
+                            <tbody>
+                                {dbData.map((row, index) => (
+                                    <tr key={index}>
+                                        {Object.values(row).map((val, i) => (
+                                            <td key={i}>
+                                                {val !== null && val !== undefined ? val.toString() : "-"}
+                                            </td>
+                                        ))}
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
-            </div>
-        ) : (
-            !loading && executedSql && !errorMessage && (
-                <p style={{ marginTop: '20px', color: '#6c757d', fontStyle: 'italic' }}>
-                    השאילתה רצה בהצלחה, אך לא נמצאו רשומות תואמות.
-                </p>
-            )
-        )}
-    </div>
-);
-}
+            ) : (
+                !loading && executedSql && !errorMessage && (
+                    <p style={{ marginTop: '20px', color: '#6c757d', fontStyle: 'italic' }}>
+                        השאילתה רצה בהצלחה, אך לא נמצאו רשומות תואמות.
+                    </p>
+                )
+            )}
+        </div>
+    );
+};
+
 export default SearchBox;
