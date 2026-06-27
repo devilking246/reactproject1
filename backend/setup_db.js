@@ -286,6 +286,30 @@ async function setup() {
                 [`dept_head_${deptId}`, defaultPassword, `dept_head_${deptId}@univ.ac.il`, deptHeadName, 'DEPT_HEAD', deptId]
             );
         }
+        console.log("🎓 Injecting custom student: דניאל פוליטי...");
+        
+        const danielId = '208286096'; // תעודת זהות קבועה עבורך
+        
+        // א. הכנסת הסטודנט למסלול הנדסת תוכנה (PROG_SOFTWARE)
+        await dbRun(`INSERT INTO STUDENT (ID, full_name, program_id, start_year, start_semester, academic_status) 
+            VALUES (?, ?, ?, ?, ?, ?)`, 
+            [danielId, 'דניאל פוליטי', 'PROG_SOFTWARE', 2019, 'A', 'Active']
+        );
+
+        // ב. שליפת כל המופעים הסמסטריאליים שנוצרו בסקריפט עבור קורסי הנדסת תוכנה
+        const softwareSemesterCourses = await dbAll(`
+            SELECT semester_course_id 
+            FROM SEMESTER_COURSE AS SC
+            JOIN CURRICULUM_COURSE AS CC ON SC.course_num = CC.course_num
+            WHERE CC.program_id = 'PROG_SOFTWARE'
+        `);
+
+        // ג. רישום של דניאל לכל אחד ואחד מהם עם ציון 100 עגול!
+        for (const course of softwareSemesterCourses) {
+            await dbRun(`INSERT OR IGNORE INTO ENROL (student_id, semester_course_id, grade) VALUES (?, ?, ?)`,
+                [danielId, course.semester_course_id, 100]
+            );
+        }
 
         await dbRun("COMMIT");
         console.log("🔥 Success! Data and users with strict school scopes successfully saved.");
