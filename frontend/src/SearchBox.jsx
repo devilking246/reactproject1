@@ -18,7 +18,25 @@ const SearchBox = ({ currentUser }) => {
         setErrorMessage("");    
         setLoading(true);
 
+        // 1. חילוץ תפקיד ומזהה המחלקה של המשתמש הנוכחי
+        const userRole = currentUser?.role;
+        const userDeptId = currentUser?.associated_dept_id;
+
+        // 2. בניית תנאי אכיפת ההרשאות הדינמי לפרומפט
+        let securityEnforcementInstruction = "";
+        
+        if (userRole === "DEPT_HEAD") {
+            securityEnforcementInstruction = `
+            - SECURITY ENFORCEMENT: The logged-in user is a DEPT_HEAD for department ID: ${userDeptId}. 
+            You MUST absolutely restrict ALL generated SQL queries to only fetch data belonging to department ID ${userDeptId}.
+            - You must append an explicit filter (e.g., AND PROGRAM.dept_id = ${userDeptId} or WHERE LECTURER.dept_id = ${userDeptId}) to ensure no data from other departments is leaked.
+            - If the user explicitly asks about another department or a department name that does not match department ID ${userDeptId}, you MUST ignore their requested department filter and enforce department ID ${userDeptId} instead.`;
+        } else {
+            securityEnforcementInstruction = `- SECURITY CONTEXT: The user is an admin/president and has global read permissions across all departments.`;
+        }
+
         const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${import.meta.env.VITE_GEMINI_API_KEY}`;            
+        
         const systemPrompt = `You are a SQL Expert. Your task is to convert natural language queries into accurate SQLite queries based on the database schema below.
 
             DATABASE SCHEMA:
@@ -36,16 +54,13 @@ const SearchBox = ({ currentUser }) => {
                 - associated_dept_id is only filled if role is 'DEPT_HEAD'.
 
         CRITICAL INSTRUCTIONS:
-            - Convert this user request into SQLite code: "${query}".
+            - Convert this user request into SQLite code: "${query}".${securityEnforcementInstruction}
             - ACADEMIC COMPLETION RULE: A student has finished their academic duties ("סיים חובות") if the count of unique courses they passed (grade >= 55) equals the total count of courses required in their PROGRAM (from CURRICULUM_COURSE).
             - COURSES REMAINING RULE (קורסים שנותרו להשלים): To find which courses a student has LEFT to complete, you must find all 'course_num' assigned to the student's program in CURRICULUM_COURSE, and EXCEPT (or use NOT IN) the 'course_num' from SEMESTER_COURSE joined with ENROL where the student_id matches and grade >= 55.
             - To count HOW MANY courses are left, count the rows resulting from the logic above grouped by the student.
             - Return ONLY the executable SQL code block. Do NOT include markdown blocks (\`\`\`sql) or explanations.
             - When asked about students in a specific department, ALWAYS join the STUDENT table with the PROGRAM table, and filter by PROGRAM.dept_id or DEPARTMENT.dept_name.
-            - NEVER invent filters for 'lecturer_id' or 'course_num' unless the user explicitly mentions a lecturer or a specific course in their question.
-            -Whenever the user asks for data related to "my department" (המחלקה שלי), you must filter the query using the exact placeholder text __CURRENT_DEPT_ID__.
-            Do not use subqueries or invent column names for the user. 
-            Example usage: WHERE T2.dept_id = __CURRENT_DEPT_ID__`;
+            - NEVER invent filters for 'lecturer_id' or 'course_num' unless the user explicitly mentions a lecturer or a specific course in their question.`;
 
         try {
             const response = await fetch(url, {
@@ -107,12 +122,10 @@ const SearchBox = ({ currentUser }) => {
         } catch (error) {
             console.error("Could not connect to Server:", error);
         }
-    };
+    }; 
 
     return (
         <div className="search-component" style={{ direction: "rtl", textAlign: "right", width: "100%" }}>
-            
-            {/* 🌟 עטיפת החיפוש - מוגבלת לחצי מסך (50vw) וממורכזת לימין */}
             <form onSubmit={handleSearch} style={{ display: "flex", gap: "10px", width: "50vw", direction: "rtl", marginBottom: "25px" }}>
                 <input
                     type="text"
@@ -128,8 +141,8 @@ const SearchBox = ({ currentUser }) => {
                         unicodeBidi: "plaintext",
                         borderRadius: "8px",
                         border: "1px solid #ccc",
-                        whiteSpace: "nowrap",       /* 🌟 מונע ירידת שורה */
-                        overflowX: "auto",          /* 🌟 מאפשר גלילה אופקית בתוך התיבה בטקסט ארוך */
+                        whiteSpace: "nowrap",        
+                        overflowX: "auto",          
                         boxSizing: "border-box"
                     }}
                     disabled={loading}
@@ -139,14 +152,12 @@ const SearchBox = ({ currentUser }) => {
                 </button>
             </form>
 
-            {/* הודעות שגיאה */}
             {errorMessage && (
                 <div className="alert-box">
                     <strong>שגיאה במערכת:</strong> {errorMessage}
                 </div>
             )}
 
-            {/* תצוגת מנהל מערכת ADMIN */}
             {currentUser && currentUser.role === 'ADMIN' && executedSql && (
                 <div className="admin-sql-box">
                     <div style={{ color: '#61afef', fontWeight: 'bold', marginBottom: '8px', fontFamily: 'sans-serif', direction: 'rtl', textAlign: 'right' }}>
@@ -156,7 +167,6 @@ const SearchBox = ({ currentUser }) => {
                 </div>
             )}
 
-            {/* טבלת תוצאות מהמסד */}
             {dbData.length > 0 ? (
                 <div style={{ marginTop: '25px', width: "100%" }}>
                     <h3 style={{ fontSize: '18px', marginBottom: '12px', fontWeight: '700' }}>תוצאות השאילתה מהמסד:</h3>
@@ -192,6 +202,6 @@ const SearchBox = ({ currentUser }) => {
             )}
         </div>
     );
-};
+}; 
 
 export default SearchBox;
