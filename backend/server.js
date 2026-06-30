@@ -30,44 +30,68 @@ app.post('/execute-sql', async (req, res) => {
 
     try {
         if (finalSql.includes('__CURRENT_DEPT_ID__')) {
-            finalSql = finalSql.replace(/__CURRENT_DEPT_ID__/g, user.associated_dept_id);
+            let deptIdsString = '';
+            if (user.role === 'SCHOOL_HEAD') {
+                const depts = await db.all(
+                    `SELECT dept_id FROM DEPARTMENT WHERE school_head_username = ?`, 
+                    [user.username]
+                );
+                deptIdsString = depts.map(d => d.dept_id).join(', ');
+            } else {
+                deptIdsString = user.associated_dept_id;
+            }
+            if (deptIdsString) {
+                finalSql = finalSql.replace(/__CURRENT_DEPT_ID__/g, deptIdsString);
+            } else {
+                finalSql = finalSql.replace(/__CURRENT_DEPT_ID__/g, 'NULL');
+            }
         }
         const results = await db.all(finalSql);
-        res.json({ sql: finalSql, results: results });
-
+        const sanitizedResults = results.map(row => {
+            const { 
+                password_hash, 
+                password,      
+                salt, 
+                ...safeRow 
+            } = row;
+            return safeRow;
+        });
+        res.json({ sql: finalSql, results: sanitizedResults });
     } catch (error) {
         res.status(400).json({ error: "שגיאה בהרצת השאילתה: " + error.message });
     }
 });
-
 app.post('/api/login', async (req, res) => {
-    const { username: loginInput, password } = req.body; // הקלט מהטופס יכול להיות או מייל או יוזרניים
+    const { username: loginInput, password } = req.body; 
 
     if (!loginInput || !password) {
         return res.status(400).json({ error: "נא למלא שם משתמש/אימייל וסיסמה" });
     }
 
     try {
-        // שאילתה הגמישה: מחפשת התאמה בשדה username או בשדה email
         const sql = `SELECT user_id, username, email, full_name, role, associated_dept_id, password_hash 
                      FROM USER 
                      WHERE username = ? OR email = ?`;
         
-        // אנו שולחים את loginInput פעמיים - פעם עבור ה-username ופעם עבור ה-email
         const user = await db.get(sql, [loginInput, loginInput]);
 
-        // בדיקה 1: האם נמצא משתמש כלשהו?
         if (!user) {
             return res.status(401).json({ error: "פרטי התחברות שגויים" });
         }
 
-        // בדיקה 2: האם הסיסמה תואמת?
         if (user.password_hash !== password) {
             return res.status(401).json({ error: "פרטי התחברות שגויים" });
         }
 
-        // מחיקת הסיסמה מהאובייקט מטעמי אבטחה
         delete user.password_hash;
+
+        if (user.role === 'SCHOOL_HEAD') {
+            const depts = await db.all(
+                `SELECT dept_id FROM DEPARTMENT WHERE school_head_username = ?`, 
+                [user.username]
+            );
+            user.school_departments = depts.map(d => d.dept_id); // יוצר מערך [101, 102]
+        }
 
         res.json({
             message: "התחברות בוצעה בהצלחה",

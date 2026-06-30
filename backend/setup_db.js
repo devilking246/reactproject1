@@ -130,7 +130,7 @@ async function setup() {
         ];
 
         for (const dept of departments) {
-            await dbRun(`INSERT OR IGNORE INTO DEPARTMENT VALUES (?, ?, ?, ?)`, dept);
+            await dbRun(`INSERT OR REPLACE INTO DEPARTMENT (dept_id, name, head_of_dept, school_head_username) VALUES (?, ?, ?, ?)`, dept);        
         }
 
         const programs = [

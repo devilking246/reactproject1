@@ -18,11 +18,10 @@ const SearchBox = ({ currentUser }) => {
         setErrorMessage("");    
         setLoading(true);
 
-        // 1. חילוץ תפקיד ומזהה המחלקה של המשתמש הנוכחי
         const userRole = currentUser?.role;
         const userDeptId = currentUser?.associated_dept_id;
+        const username = currentUser?.username;
 
-        // 2. בניית תנאי אכיפת ההרשאות הדינמי לפרומפט
         let securityEnforcementInstruction = "";
         
         if (userRole === "DEPT_HEAD") {
@@ -31,8 +30,17 @@ const SearchBox = ({ currentUser }) => {
             You MUST absolutely restrict ALL generated SQL queries to only fetch data belonging to department ID ${userDeptId}.
             - You must append an explicit filter (e.g., AND PROGRAM.dept_id = ${userDeptId} or WHERE LECTURER.dept_id = ${userDeptId}) to ensure no data from other departments is leaked.
             - If the user explicitly asks about another department or a department name that does not match department ID ${userDeptId}, you MUST ignore their requested department filter and enforce department ID ${userDeptId} instead.`;
-        } else {
-            securityEnforcementInstruction = `- SECURITY CONTEXT: The user is an admin/president and has global read permissions across all departments.`;
+        } 
+        else if (userRole === "SCHOOL_HEAD") {
+            securityEnforcementInstruction = `
+            - SECURITY ENFORCEMENT: The logged-in user is a SCHOOL_HEAD with username: '${username}'.
+            - You MUST absolutely restrict ALL generated SQL queries to only fetch data from departments managed by this School Head.
+            - To enforce this, you MUST join or filter any query involving departments, programs, students, or lecturers with a condition restricting 'dept_id' to only those where DEPARTMENT.school_head_username = '${username}'.
+            - Example constraint to include: dept_id IN (SELECT dept_id FROM DEPARTMENT WHERE school_head_username = '${username}').
+            - If the user asks about a department outside their school, you MUST override their request and strictly limit the data to their managed departments only.`;
+        } 
+        else {
+            securityEnforcementInstruction = `- SECURITY CONTEXT: The user is an admin/president (PRESIDENT) and has global read permissions across all departments.`;
         }
 
         const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${import.meta.env.VITE_GEMINI_API_KEY}`;            
@@ -55,6 +63,7 @@ const SearchBox = ({ currentUser }) => {
 
         CRITICAL INSTRUCTIONS:
             - Convert this user request into SQLite code: "${query}".${securityEnforcementInstruction}
+            - SECURITY RULE: NEVER include 'password', 'password_hash', or 'salt' columns in your SELECT statements under any circumstances.
             - ACADEMIC COMPLETION RULE: A student has finished their academic duties ("סיים חובות") if the count of unique courses they passed (grade >= 55) equals the total count of courses required in their PROGRAM (from CURRICULUM_COURSE).
             - COURSES REMAINING RULE (קורסים שנותרו להשלים): To find which courses a student has LEFT to complete, you must find all 'course_num' assigned to the student's program in CURRICULUM_COURSE, and EXCEPT (or use NOT IN) the 'course_num' from SEMESTER_COURSE joined with ENROL where the student_id matches and grade >= 55.
             - To count HOW MANY courses are left, count the rows resulting from the logic above grouped by the student.
