@@ -9,6 +9,8 @@ to run open 2 terminals first terminal write cd backend then node server.js
 
 
 second terminal  write cd frontend them npm run dev 
+
+
 enjoy 
 
 # React + Vite
