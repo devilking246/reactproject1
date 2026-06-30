@@ -5,12 +5,10 @@ const { promisify } = require('util');
 async function setup() {
     const db = new sqlite3.Database('./university.db');
     
-    // הפיכת כל הפונקציות של sqlite ל-Promises בצורה תקנית
     const dbRun = promisify(db.run.bind(db));
-    const dbAll = promisify(db.all.bind(db)); // <-- הוספנו תמיכה מלאה בבקשות SELECT
+    const dbAll = promisify(db.all.bind(db)); 
     const dbClose = promisify(db.close.bind(db));
 
-    // === שלב 0: ניקוי אגרסיבי של טבלאות ישנות ===
     try {
         await dbRun(`DROP TABLE IF EXISTS USER`);
         await dbRun(`DROP TABLE IF EXISTS ENROL`);
