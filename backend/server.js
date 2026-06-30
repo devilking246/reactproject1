@@ -90,7 +90,7 @@ app.post('/api/login', async (req, res) => {
                 `SELECT dept_id FROM DEPARTMENT WHERE school_head_username = ?`, 
                 [user.username]
             );
-            user.school_departments = depts.map(d => d.dept_id); // יוצר מערך [101, 102]
+            user.school_departments = depts.map(d => d.dept_id); 
         }
 
         res.json({
