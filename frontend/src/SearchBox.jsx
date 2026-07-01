@@ -60,7 +60,13 @@ const SearchBox = ({ currentUser }) => {
             9. USER (user_id PK AUTOINCREMENT [int], username UNIQUE [string], password_hash [string], full_name [string], role [string], associated_dept_id NULL FK [int])
                 - role can be 'PRESIDENT', 'SCHOOL_HEAD', or 'DEPT_HEAD'.
                 - associated_dept_id is only filled if role is 'DEPT_HEAD'.
-
+        
+        MULTILINGUAL & TEXT MATCHING RULES:
+            - IMPORTANT: The data inside the database (course_name, name, program_name, full_name, academic_status) is stored in HEBREW.
+            - If the user asks their question in English, you MUST mentally translate the requested concepts, names, statuses, or departments into their correct Hebrew equivalent before generating the SQL filter.
+            - For ALL string-based columns (names, titles, statuses), ALWAYS use the SQL 'LIKE' operator with '%' wildcards (e.g., WHERE course_name LIKE '%תכנות%' or WHERE academic_status LIKE '%מושהה%') to ensure flexible matching and prevent 0 results due to minor translation or phrasing differences.
+            - If you are uncertain of the exact Hebrew translation, use an OR clause to check both possibilities: (column LIKE '%English_Term%' OR column LIKE '%Hebrew_Equivalent%').
+    
         CRITICAL INSTRUCTIONS:
             - Convert this user request into SQLite code: "${query}".${securityEnforcementInstruction}
             - SECURITY RULE: NEVER include 'password', 'password_hash', or 'salt' columns in your SELECT statements under any circumstances.
